@@ -1,0 +1,85 @@
+# ============================================
+# 项目基本信息配置
+# ============================================
+[project]
+name = "deploy-tool"                                          # 项目名称
+version = "1.0.0"                                             # 版本号
+description = "Docker镜像构建、打包和部署的自动化工具"             # 项目描述
+readme = "README.md"                                          # README 文件
+requires-python = ">=3.12"                                    # 要求的 Python 版本
+
+# 作者信息
+authors = [
+    { name = "Your Name", email = "your.email@example.com" }
+]
+
+# 项目关键词（用于搜索）
+keywords = ["docker", "deployment", "automation", "devops"]
+
+# 项目分类标签
+classifiers = [
+    "Development Status :: 3 - Alpha",                        # 开发状态：Alpha 阶段
+    "Intended Audience :: Developers",                        # 目标用户：开发者
+    "Topic :: Software Development :: Build Tools",           # 主题：构建工具
+    "Programming Language :: Python :: 3.12",                 # 编程语言版本
+]
+
+# ============================================
+# 项目依赖配置
+# ============================================
+dependencies = [
+    "PyYAML>=6.0.1",        # YAML 配置文件解析库
+    "requests>=2.31.0",     # HTTP 请求库
+    "urllib3<2.0.0",        # HTTP 客户端库（兼容 LibreSSL）
+    "paramiko>=3.3.1",      # SSH 连接和操作库
+    "scp>=0.14.5",          # SCP 文件传输库
+    "fabric>=3.2.2",        # 远程服务器部署工具
+    "typer>=0.9.0",         # 命令行界面（CLI）框架
+    "rich>=13.9.4",         # 终端美化和进度条库
+    "docker>=7.0.0",        # Docker Python SDK
+    "pydantic>=2.6.1",      # 数据验证和设置管理库
+    "python-dotenv>=1.0.0", # 环境变量管理库
+]
+
+# ============================================
+# 可选依赖配置（开发工具）
+# ============================================
+[project.optional-dependencies]
+dev = [
+    "black>=23.9.1",        # 代码格式化工具
+    "mypy>=1.5.1",          # 静态类型检查工具
+    "pytest>=7.4.2",        # 单元测试框架
+]
+
+# 进度条示例依赖（用于 examples/progress 目录）
+examples = [
+    "tqdm>=4.66.1",         # 经典进度条库
+    "yaspin>=2.5.0",        # 终端旋转器/加载动画
+    "alive-progress>=3.1.5", # 动画进度条库
+    "halo>=0.0.31",         # 终端加载动画
+]
+
+# ============================================
+# 命令行工具配置
+# ============================================
+[project.scripts]
+# 安装后可以直接在终端使用 'deploy-tool' 命令
+# 它会执行 deploy_tool.scripts.main 模块中的 app 函数
+deploy-tool = "deploy_tool.scripts.main:app"
+
+# ============================================
+# 构建系统配置
+# ============================================
+[build-system]
+requires = ["hatchling"]                # 使用 hatchling 作为构建后端
+build-backend = "hatchling.build"       # 指定构建后端
+
+# ============================================
+# 打包配置
+# ============================================
+[tool.hatch.build.targets.wheel]
+packages = ["deploy_tool"]              # 指定要打包的目录
+
+# 强制包含配置文件目录
+[tool.hatch.build.targets.wheel.force-include]
+"deploy_tool/config" = "deploy_tool/config"  # 确保配置文件被打包进去

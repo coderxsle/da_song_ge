@@ -1,0 +1,76 @@
+# 远程服务器配置文件示例
+# 请根据实际情况修改此文件
+
+servers:
+  # ======================================================================================================
+  #                                              示例服务器 1                                               
+  - name: 示例服务器
+    host: 192.168.1.10
+    port: 22
+    username: deploy
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+      password: your_password_here  # 可选：SSH 密码（如果不提供，连接时会提示输入）
+
+    # 上传配置
+    upload:
+      # 前端后台管理页面
+      frontend_admin: 
+        - local_path: ~/workspace/my_project/admin/dist/
+          remote_path: /var/www/html/admin/
+          mode: sync
+          delete_extra: true
+      
+      # 前端静态页面  
+      frontend_static: 
+        - local_path: ~/workspace/my_project/web/dist/
+          remote_path: /var/www/html/web/
+          mode: sync
+          delete_extra: true
+
+      # 后端接口服务
+      backend_api_server:
+        - local_path: ~/workspace/my_project/server/target/app.jar
+          remote_path: /opt/app/
+
+        - local_path: ~/workspace/my_project/server/scripts/start.sh
+          remote_path: /opt/app/bin/
+
+    # 远程服务器需要执行的命令
+    commands:
+      # 重启 Nginx
+      reload_nginx:
+        - nginx -t
+        - systemctl reload nginx
+      
+      # 后端服务重启
+      backend_api_server:
+        - cd /opt/app/bin
+        - sh stop.sh
+        - sh start.sh
+  # ======================================================================================================
+
+
+  # ======================================================================================================
+  #                                              示例服务器 2（使用密码认证）                                               
+  - name: 测试服务器
+    host: 192.168.1.20
+    port: 2222
+    username: admin
+    auth:
+      type: password
+      password: your_password_here  # 可选：SSH 密码（如果不提供，连接时会提示输入）
+
+    upload:
+      frontend_admin: 
+        - local_path: ~/workspace/test_project/dist/
+          remote_path: /home/admin/web/
+          mode: copy
+
+    commands:
+      restart_service:
+        - cd /home/admin/web
+        - pm2 restart app
+  # ======================================================================================================
+

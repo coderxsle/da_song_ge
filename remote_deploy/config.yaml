@@ -1,0 +1,139 @@
+
+servers:
+  # ======================================================================================================
+  #                                              领航不良资产测试                                               
+  - name: 医专学校附属医院
+    host: 123.57.173.29
+    port: 22
+    username: root
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+      password: Lixuesong1990
+    # 本地命令（在上传文件之前执行）
+    # 可以为每个上传类型配置不同的本地命令
+    local_commands:
+      # 后端项目编译命令
+      backend_api:
+        working_dir: ~/workspace/ling_hang/ling_hang_server
+        commands:
+          - mvn clean package -Dmaven.test.skip=true
+      # 前端项目编译命令
+      frontend_admin:
+        working_dir: ~/workspace/ling_hang/ling_hang_admin  # 工作目录（可选）
+        commands:
+          - npm install
+          - npm run build:prod
+    # 文件上传可以自定义项目，例如：backend、frontend、admin、、static、worker等
+    upload:
+      # 后端接口服务
+      backend_api:
+        - local_path: ~/Desktop/未命名文件夹/
+          remote_path: /home/admin/web_projects/dccw/server-api/
+
+        - local_path: ~/Desktop/test.sh
+          remote_path: /home/admin/web_projects/dccw/server-api/bin/
+      
+      # 前端静态页面  
+      frontend_static: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+
+      # 前端后台管理页面
+      frontend_admin: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+          mode: sync   # 或者使用 copy ，如果使用 sync 则服务器完全同步本地目录。
+          delete_extra: true # 设置为 true 可以删除服务器该目录上多余的旧文件，它只在 mode: sync 时才有意义。
+
+    # 远程服务器需要执行的命令
+    commands:
+      # 后端执行命令
+      backend_api:
+        - cd /home/admin/web_projects/dccw/server-api/bin
+        - sh test.sh
+  # ======================================================================================================
+
+
+
+
+  # ======================================================================================================
+  #                                              领航不良资产                                               
+  - name: 领航不良资产
+    host: 192.168.1.10
+    port: 5555
+    username: deploy
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+    # 可以自定义 admin、worker、static、frontend、backend等
+    upload:
+      # 前端后台管理页面
+      frontend_admin: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+          mode: sync   # 或者使用 copy ，如果使用 sync 则服务器完全同步本地目录。
+          delete_extra: true # 设置为 true 可以删除服务器该目录上多余的旧文件，它只在 mode: sync 时才有意义。
+      
+      # 前端静态页面  
+      frontend_static: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+
+      # 后端接口服务
+      backend_api:
+        - local_path: ~/workspace/ling_hang/ling_hang_server/yudao-server/target/yudao-server.jar
+          remote_path: /home/admin/web_projects/dccw/server-api/
+
+        - local_path: ~/workspace//workspace/ling_hang/ling_hang_server/script/shell/startup1.sh
+          remote_path: /home/admin/web_projects/dccw/server-api/bin
+
+    # 远程服务器需要执行的命令
+    commands:
+      # 后端执行命令
+      backend_api:
+        - cd /home/admin/web_projects/dccw/server-api/bin
+        - sh startup1.sh
+  # ======================================================================================================
+
+
+  # ======================================================================================================
+  #                                              汽车园区项目                                               
+  - name: 汽车园区项目
+    host: 192.168.0.106
+    port: 55555
+    username: admin
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+   # 可以自定义 admin、worker、static、frontend、backend等
+    upload:
+      # 前端后台管理页面
+      frontend_admin: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+          mode: sync   # 或者使用 copy ，如果使用 sync 则服务器完全同步本地目录。
+          delete_extra: true # 设置为 true 可以删除服务器该目录上多余的旧文件，它只在 mode: sync 时才有意义。ChatGPT 说这个配置一看就是“吃过线上亏”的人写的 😄 
+      
+      # 前端静态页面
+      frontend_static: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+
+      # 后端接口服务
+      backend_api:
+        - local_path: ~/workspace/ling_hang/ling_hang_server/yudao-server/target/yudao-server.jar
+          remote_path: /home/admin/web_projects/dccw/server-api/
+
+        - local_path: ~/workspace//workspace/ling_hang/ling_hang_server/script/shell/startup1.sh
+          remote_path: /home/admin/web_projects/dccw/server-api/bin
+
+    # 远程服务器需要执行的命令
+    commands:
+      # 后端执行命令
+      backend_api:
+        - cd /home/admin/web_projects/dccw/server-api/bin
+        - sh startup1.sh
+  # ======================================================================================================

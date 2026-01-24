@@ -1,0 +1,280 @@
+# ==================== 本地命令配置示例 ====================
+# 本地命令会在上传文件之前执行，常用于编译、打包等操作
+
+servers:
+  - name: 示例服务器
+    host: 192.168.1.100
+    port: 22
+    username: admin
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+    # ==================== 本地命令配置 ====================
+    # 为每个上传类型配置对应的本地命令
+    local_commands:
+      
+      # 前端项目（Vue/React/Angular）
+      frontend_admin:
+        working_dir: ~/workspace/my_project/frontend  # 工作目录
+        stop_on_error: true  # 遇到错误是否停止（默认 true）
+        commands:
+          - echo "开始编译前端项目..."
+          - npm install  # 安装依赖
+          - npm run build:prod  # 生产环境编译
+          - echo "前端编译完成！"
+      
+      # 后端项目（Java Maven）
+      backend_api:
+        working_dir: ~/workspace/my_project/backend
+        commands:
+          - echo "开始编译后端项目..."
+          - mvn clean package -Dmaven.test.skip=true  # Maven 打包（跳过测试）
+          - echo "后端编译完成！"
+      
+      # 后端项目（Java Gradle）
+      backend_gradle:
+        working_dir: ~/workspace/my_project/backend
+        commands:
+          - echo "开始编译后端项目..."
+          - ./gradlew clean build -x test  # Gradle 打包（跳过测试）
+          - echo "后端编译完成！"
+      
+      # Python 项目
+      backend_python:
+        working_dir: ~/workspace/my_project/python_app
+        commands:
+          - echo "准备 Python 项目..."
+          - pip install -r requirements.txt  # 安装依赖
+          - python -m pytest  # 运行测试
+          - echo "Python 项目准备完成！"
+      
+      # Go 项目
+      backend_go:
+        working_dir: ~/workspace/my_project/go_app
+        commands:
+          - echo "开始编译 Go 项目..."
+          - go mod download  # 下载依赖
+          - go build -o bin/app main.go  # 编译
+          - echo "Go 项目编译完成！"
+      
+      # Node.js 项目
+      backend_nodejs:
+        working_dir: ~/workspace/my_project/nodejs_app
+        commands:
+          - echo "准备 Node.js 项目..."
+          - npm install
+          - npm run build
+          - npm test
+          - echo "Node.js 项目准备完成！"
+      
+      # Docker 镜像构建
+      docker_build:
+        working_dir: ~/workspace/my_project
+        commands:
+          - echo "开始构建 Docker 镜像..."
+          - docker build -t myapp:latest .
+          - docker save myapp:latest -o myapp.tar
+          - echo "Docker 镜像构建完成！"
+      
+      # 静态资源压缩
+      static_compress:
+        working_dir: ~/workspace/my_project/static
+        commands:
+          - echo "压缩静态资源..."
+          - tar -czf static.tar.gz dist/
+          - echo "静态资源压缩完成！"
+
+    # ==================== 上传配置 ====================
+    upload:
+      frontend_admin:
+        - local_path: ~/workspace/my_project/frontend/dist/
+          remote_path: /var/www/html/
+          mode: sync
+          delete_extra: true
+      
+      backend_api:
+        - local_path: ~/workspace/my_project/backend/target/app.jar
+          remote_path: /opt/app/
+      
+      docker_build:
+        - local_path: ~/workspace/my_project/myapp.tar
+          remote_path: /tmp/
+
+    # ==================== 远程命令配置 ====================
+    commands:
+      backend_api:
+        - cd /opt/app
+        - sh restart.sh
+      
+      docker_build:
+        - docker load -i /tmp/myapp.tar
+        - docker stop myapp || true
+        - docker rm myapp || true
+        - docker run -d --name myapp -p 8080:8080 myapp:latest
+
+
+# ==================== 高级用法示例 ====================
+
+  - name: 高级示例
+    host: 192.168.1.101
+    port: 22
+    username: deploy
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+    local_commands:
+      # 多步骤构建流程
+      full_stack:
+        working_dir: ~/workspace/full_stack_project
+        commands:
+          # 1. 清理旧文件
+          - rm -rf dist/ build/ target/
+          
+          # 2. 编译前端
+          - cd frontend && npm install && npm run build && cd ..
+          
+          # 3. 编译后端
+          - cd backend && mvn clean package -DskipTests && cd ..
+          
+          # 4. 复制文件到统一目录
+          - mkdir -p dist/frontend dist/backend
+          - cp -r frontend/dist/* dist/frontend/
+          - cp backend/target/*.jar dist/backend/
+          
+          # 5. 创建部署包
+          - tar -czf deploy.tar.gz dist/
+          
+          - echo "完整构建流程完成！"
+      
+      # 带环境变量的构建
+      with_env:
+        working_dir: ~/workspace/my_project
+        commands:
+          - export NODE_ENV=production
+          - export API_URL=https://api.example.com
+          - npm run build
+      
+      # 条件执行
+      conditional:
+        working_dir: ~/workspace/my_project
+        stop_on_error: false  # 允许某些命令失败
+        commands:
+          - npm install || echo "npm install 失败，继续执行"
+          - npm run build
+          - test -f dist/index.html && echo "构建成功" || echo "构建失败"
+
+    upload:
+      full_stack:
+        - local_path: ~/workspace/full_stack_project/deploy.tar.gz
+          remote_path: /tmp/
+
+    commands:
+      full_stack:
+        - cd /tmp
+        - tar -xzf deploy.tar.gz
+        - sh /opt/scripts/deploy.sh
+
+
+# ==================== 常见场景 ====================
+
+  # 场景1：前端项目（Vue3 + Vite）
+  - name: Vue3项目
+    host: 192.168.1.102
+    port: 22
+    username: www
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+    local_commands:
+      frontend:
+        working_dir: ~/workspace/vue3-project
+        commands:
+          - npm install
+          - npm run build
+    
+    upload:
+      frontend:
+        - local_path: ~/workspace/vue3-project/dist/
+          remote_path: /var/www/html/
+          mode: sync
+          delete_extra: true
+
+  # 场景2：Spring Boot 项目
+  - name: SpringBoot项目
+    host: 192.168.1.103
+    port: 22
+    username: java
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+    local_commands:
+      backend:
+        working_dir: ~/workspace/springboot-project
+        commands:
+          - mvn clean package -Dmaven.test.skip=true
+    
+    upload:
+      backend:
+        - local_path: ~/workspace/springboot-project/target/app.jar
+          remote_path: /opt/app/
+    
+    commands:
+      backend:
+        - cd /opt/app
+        - sh restart.sh
+
+  # 场景3：微服务项目（多个服务）
+  - name: 微服务项目
+    host: 192.168.1.104
+    port: 22
+    username: microservice
+    auth:
+      type: ssh_key
+      key_path: ~/.ssh/id_rsa
+
+    local_commands:
+      # 用户服务
+      user_service:
+        working_dir: ~/workspace/microservices/user-service
+        commands:
+          - mvn clean package -DskipTests
+      
+      # 订单服务
+      order_service:
+        working_dir: ~/workspace/microservices/order-service
+        commands:
+          - mvn clean package -DskipTests
+      
+      # 网关服务
+      gateway_service:
+        working_dir: ~/workspace/microservices/gateway
+        commands:
+          - mvn clean package -DskipTests
+    
+    upload:
+      user_service:
+        - local_path: ~/workspace/microservices/user-service/target/user-service.jar
+          remote_path: /opt/services/user/
+      
+      order_service:
+        - local_path: ~/workspace/microservices/order-service/target/order-service.jar
+          remote_path: /opt/services/order/
+      
+      gateway_service:
+        - local_path: ~/workspace/microservices/gateway/target/gateway.jar
+          remote_path: /opt/services/gateway/
+    
+    commands:
+      user_service:
+        - cd /opt/services/user && sh restart.sh
+      
+      order_service:
+        - cd /opt/services/order && sh restart.sh
+      
+      gateway_service:
+        - cd /opt/services/gateway && sh restart.sh
+
