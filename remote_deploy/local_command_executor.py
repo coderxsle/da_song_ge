@@ -84,7 +84,7 @@ class LocalCommandExecutor:
                     console.print(f"[yellow]⚠ 命令失败但继续执行后续命令[/yellow]")
             else:
                 console.print(f"[green]✓ 命令执行成功[/green]")
-            
+                
             console.print()
         
         console.print(Panel.fit(
@@ -107,36 +107,96 @@ class LocalCommandExecutor:
             Tuple[bool, str, int]: (是否成功, 输出, 退出码)
         """
         try:
-            # 使用 shell=True 来支持管道、重定向等 shell 特性
+            import sys
+            import select
+            import pty
+            import fcntl
+            import termios
+            import struct
+            import time
+            
+            console.print("[dim]" + "─" * 60 + "[/dim]")
+            
+            # 使用 pty 创建伪终端，让命令认为它在真实终端中运行
+            master_fd, slave_fd = pty.openpty()
+            
+            # 设置终端大小（避免输出换行问题）
+            winsize = struct.pack('HHHH', 24, 80, 0, 0)
+            fcntl.ioctl(slave_fd, termios.TIOCSWINSZ, winsize)
+            
+            # 启动进程
             process = subprocess.Popen(
                 command,
                 shell=True,
                 cwd=working_dir,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.STDOUT,
-                text=True,
-                encoding='utf-8',
-                errors='replace',
-                bufsize=1,  # 行缓冲
-                universal_newlines=True
+                stdout=slave_fd,
+                stderr=slave_fd,
+                stdin=slave_fd,
+                close_fds=True,
+                preexec_fn=os.setsid
             )
             
-            # 实时读取并输出日志
+            # 关闭子进程端的文件描述符
+            os.close(slave_fd)
+            
+            # 设置非阻塞模式
+            flags = fcntl.fcntl(master_fd, fcntl.F_GETFL)
+            fcntl.fcntl(master_fd, fcntl.F_SETFL, flags | os.O_NONBLOCK)
+            
+            # 实时读取并输出
             output_lines = []
-            console.print("[dim]" + "─" * 60 + "[/dim]")
+            no_data_count = 0
             
-            for line in iter(process.stdout.readline, ''):
-                if line:
-                    # 实时打印到控制台
-                    console.print(line.rstrip())
-                    # 保存输出用于错误处理
-                    output_lines.append(line)
-            
-            console.print("[dim]" + "─" * 60 + "[/dim]")
+            while True:
+                # 检查进程是否结束
+                poll_result = process.poll()
+                
+                # 使用 select 等待数据
+                try:
+                    readable, _, _ = select.select([master_fd], [], [], 0.1)
+                    
+                    if readable:
+                        try:
+                            data = os.read(master_fd, 4096)
+                            if data:
+                                text = data.decode('utf-8', errors='replace')
+                                # 直接输出到终端（保留所有控制字符）
+                                sys.stdout.write(text)
+                                sys.stdout.flush()
+                                output_lines.append(text)
+                                no_data_count = 0
+                            else:
+                                # 没有数据了
+                                no_data_count += 1
+                        except OSError as e:
+                            # 读取结束
+                            if e.errno == 5:  # Input/output error
+                                break
+                            no_data_count += 1
+                    else:
+                        no_data_count += 1
+                    
+                    # 如果进程已结束
+                    if poll_result is not None:
+                        # 再尝试读取几次，确保所有数据都读完
+                        if no_data_count > 3:
+                            break
+                        time.sleep(0.05)
+                        
+                except Exception:
+                    break
             
             # 等待进程结束
-            process.wait()
-            exit_code = process.returncode
+            exit_code = process.wait()
+            
+            # 关闭主端文件描述符
+            try:
+                os.close(master_fd)
+            except:
+                pass
+            
+            print()  # 确保最后有换行
+            console.print("[dim]" + "─" * 60 + "[/dim]")
             
             # 判断是否成功
             success = exit_code == 0
@@ -151,6 +211,8 @@ class LocalCommandExecutor:
                 f"[bold red]❌ 命令执行异常: {e}[/bold red]",
                 border_style="red"
             ))
+            import traceback
+            traceback.print_exc()
             return False, str(e), -1
     
     def _handle_command_failure(self, command: str, exit_code: int, output: str):

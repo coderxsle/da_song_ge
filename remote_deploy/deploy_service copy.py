@@ -8,9 +8,6 @@
 
 import os
 import sys
-import time
-import signal
-from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 from common.ssh_client import SSHClient
 from common.log_utils import log_error
@@ -23,7 +20,6 @@ from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Prompt
-from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 from rich import box
 
 console = Console()
@@ -115,16 +111,6 @@ class RemoteDeployService:
             ))
             return False
         
-        # 选择定时部署（新增）
-        delay_seconds = service._select_schedule_time_interactive()
-        if delay_seconds is None:
-            # 用户取消操作
-            console.print(Panel.fit(
-                "[bold yellow]⚠ 操作已取消[/bold yellow]",
-                border_style="yellow"
-            ))
-            return False
-        
         # 模拟执行
         if dry_run:
             console.print(Panel.fit(
@@ -134,10 +120,6 @@ class RemoteDeployService:
             ))
             service._show_dry_run_info(server_config, upload_types, command_group)
             return True
-        
-        # 如果设置了延迟，进行倒计时等待
-        if delay_seconds > 0:
-            service._countdown_wait(delay_seconds, server_config, upload_types, command_group)
         
         # 执行部署
         return service._execute_deployment(server_config, upload_types, command_group)
@@ -289,8 +271,8 @@ class RemoteDeployService:
                 console.print("\n[yellow]⚠ 操作已取消[/yellow]")
                 return None
     
-    def _select_command_group_interactive(self, server_config: Dict[str, Any]) -> Optional[List[str]]:
-        """交互式选择命令组（支持多选）"""
+    def _select_command_group_interactive(self, server_config: Dict[str, Any]) -> Optional[str]:
+        """交互式选择命令组"""
         commands_config = server_config.get('commands', {})
         
         if not commands_config:
@@ -304,7 +286,7 @@ class RemoteDeployService:
         
         console.print()
         console.print(Panel.fit(
-            "[bold yellow]可用命令组（支持多选）[/bold yellow]",
+            "[bold yellow]可用命令组[/bold yellow]",
             border_style="magenta",
             title="⚙️  命令选择"
         ))
@@ -320,27 +302,21 @@ class RemoteDeployService:
         )
         
         table.add_column("序号", justify="center", style="bold yellow", width=6, vertical="middle")
-        table.add_column("命令组", style="bold green", width=25, vertical="middle")
-        table.add_column("命令语句", style="cyan", width=60, vertical="middle")
+        table.add_column("命令组", style="bold green", width=30, vertical="middle")
+        table.add_column("命令数量", style="cyan", width=15, vertical="middle")
         
         for idx, group in enumerate(command_groups, 1):
-            commands = commands_config[group]
-            # 显示命令语句，每条命令一行
-            cmd_display = "\n".join([f"• {cmd}" for cmd in commands])
+            cmd_count = len(commands_config[group])
             table.add_row(
                 str(idx),
                 group,
-                cmd_display
+                f"{cmd_count} 条命令"
             )
         
-        # 添加全选和跳过选项
+        # 添加跳过选项
+        skip_option = len(command_groups) + 1
         table.add_row(
-            "all",
-            "[green]全部执行[/green]",
-            f"{len(command_groups)} 个命令组"
-        )
-        table.add_row(
-            "0",
+            str(skip_option),
             "[yellow]跳过命令执行[/yellow]",
             "-"
         )
@@ -352,423 +328,63 @@ class RemoteDeployService:
         while True:
             try:
                 choice = Prompt.ask(
-                    "[bold cyan]请选择命令组编号（多选用逗号或空格分隔，如: 1,2 或 1 2 或输入 all 全选）[/bold cyan]"
+                    "[bold cyan]请选择命令组编号[/bold cyan]"
                 )
                 
-                # 处理跳过
-                if choice.strip() == '0':
-                    console.print("[yellow]⚠ 已跳过命令执行[/yellow]")
-                    return None
-                
-                # 处理全选
-                if choice.strip().lower() == 'all':
-                    console.print(f"[green]✓ 已选择执行命令组:[/green] [bold]{', '.join(command_groups)}[/bold]")
-                    return command_groups
-                
-                # 统一处理中英文逗号和空格分隔符
-                choice = choice.replace('，', ',')  # 中文逗号转英文逗号
-                # 先按逗号分割，再对每部分按空格分割
-                parts = []
-                for segment in choice.split(','):
-                    parts.extend(segment.split())
-                
-                # 处理多选
-                selected_indices = []
-                invalid_inputs = []
-                
-                for part in parts:
-                    part = part.strip()
-                    if not part:
-                        continue
-                    try:
-                        idx = int(part)
-                        if 1 <= idx <= len(command_groups):
-                            selected_indices.append(idx)
-                        else:
-                            invalid_inputs.append(part)
-                    except ValueError:
-                        invalid_inputs.append(part)
-                
-                # 显示无效输入警告
-                if invalid_inputs:
-                    console.print(f"[yellow]⚠ 忽略无效输入: {', '.join(invalid_inputs)}[/yellow]")
-                
-                # 如果没有有效选择，提示重新输入
-                if not selected_indices:
-                    console.print("[red]❌ 未选择有效的命令组，请重新输入[/red]")
+                choice = choice.strip()
+                if not choice:
+                    console.print("[red]❌ 输入不能为空，请重新输入[/red]")
                     console.print()
                     continue
                 
-                # 去重并排序
-                selected_indices = sorted(set(selected_indices))
-                selected_groups = [command_groups[idx - 1] for idx in selected_indices]
-                
-                console.print(f"[green]✓ 已选择执行命令组:[/green] [bold]{', '.join(selected_groups)}[/bold]")
-                return selected_groups
+                try:
+                    idx = int(choice)
+                    
+                    # 检查是否为跳过选项
+                    if idx == skip_option:
+                        console.print("[yellow]⚠ 已跳过命令执行[/yellow]")
+                        return None
+                    
+                    # 检查是否为有效的命令组编号
+                    if 1 <= idx <= len(command_groups):
+                        selected = command_groups[idx - 1]
+                        console.print(f"[green]✓ 已选择命令组:[/green] [bold]{selected}[/bold]")
+                        return selected
+                    else:
+                        console.print(f"[red]❌ 无效的编号: {choice}，请输入 1-{skip_option} 之间的数字[/red]")
+                        console.print()
+                        continue
+                        
+                except ValueError:
+                    console.print(f"[red]❌ 无效的输入: {choice}，请输入数字[/red]")
+                    console.print()
+                    continue
                     
             except KeyboardInterrupt:
                 console.print("\n[yellow]⚠ 操作已取消[/yellow]")
                 return None
     
-    def _select_schedule_time_interactive(self) -> Optional[int]:
-        """
-        交互式选择定时部署时间（60秒超时）
-        
-        Returns:
-            Optional[int]: 延迟秒数，0表示立即执行，None表示用户取消
-        """
+    def _execute_deployment(self, server_config: Dict[str, Any], 
+                           upload_types: Optional[List[str]],
+                           command_group: Optional[str]) -> bool:
+        """执行部署（支持多个应用类型）"""
         console.print()
         console.print(Panel.fit(
-            "[bold yellow]是否需要定时部署？[/bold yellow]",
+            f"[bold yellow]开始部署[/bold yellow]\n"
+            f"[cyan]服务器:[/cyan] {server_config['name']}\n"
+            f"[cyan]地址:[/cyan] {server_config['host']}:{server_config['port']}\n"
+            f"[cyan]用户:[/cyan] {server_config['username']}",
             border_style="magenta",
-            title="⏰ 定时部署"
+            title="🚀 部署执行"
         ))
         console.print()
         
-        # 计算次日凌晨3点和5点的时间
-        now = datetime.now()
-        tomorrow = now + timedelta(days=1)
-        tomorrow_3am = tomorrow.replace(hour=3, minute=0, second=0, microsecond=0)
-        tomorrow_5am = tomorrow.replace(hour=5, minute=0, second=0, microsecond=0)
-        
-        # 创建定时选项表格
-        table = Table(
-            box=box.ROUNDED,
-            border_style="bright_blue",
-            show_header=True,
-            header_style="bold cyan",
-            # show_lines=True
-        )
-        
-        table.add_column("选项", justify="center", style="bold yellow", width=6, vertical="middle")
-        table.add_column("说明", style="bold green", width=50, vertical="middle")
-        
-        table.add_row("0", "立即执行（默认）")
-        table.add_row("1", "30分钟后执行")
-        table.add_row("2", "1小时后执行")
-        table.add_row("3", f"次日凌晨 03:00 执行 ({tomorrow_3am.strftime('%Y-%m-%d %H:%M:%S')})")
-        table.add_row("4", f"次日凌晨 05:00 执行 ({tomorrow_5am.strftime('%Y-%m-%d %H:%M:%S')})")
-        table.add_row("5", "自定义延迟时间（分钟）")
-        table.add_row("6", "自定义目标时间（日期时间）")
-        
-        console.print(table)
-        console.print()
-        
-        # 使用信号处理超时（60秒）
-        def timeout_handler(signum, frame):
-            raise TimeoutError()
-        
-        try:
-            # 设置60秒超时
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(60)
-            
-            choice = Prompt.ask(
-                "[bold cyan]请选择定时选项（60秒内无输入将立即执行）[/bold cyan]",
-                default="0"
-            )
-            
-            # 取消超时
-            signal.alarm(0)
-            
-            choice = choice.strip()
-            
-            # 处理选项
-            if choice == "0":
-                console.print("[green]✓ 将立即执行部署[/green]")
-                return 0
-            elif choice == "1":
-                console.print("[green]✓ 将在 30 分钟后执行[/green]")
-                return 1800
-            elif choice == "2":
-                console.print("[green]✓ 将在 1 小时后执行[/green]")
-                return 3600
-            elif choice == "3":
-                delay = int((tomorrow_3am - now).total_seconds())
-                if delay <= 0:
-                    console.print("[red]❌ 目标时间已过期[/red]")
-                    return self._select_schedule_time_interactive()
-                hours = delay // 3600
-                minutes = (delay % 3600) // 60
-                console.print(f"[green]✓ 将在次日凌晨 03:00 执行（{hours}小时{minutes}分钟后）[/green]")
-                return delay
-            elif choice == "4":
-                delay = int((tomorrow_5am - now).total_seconds())
-                if delay <= 0:
-                    console.print("[red]❌ 目标时间已过期[/red]")
-                    return self._select_schedule_time_interactive()
-                hours = delay // 3600
-                minutes = (delay % 3600) // 60
-                console.print(f"[green]✓ 将在次日凌晨 05:00 执行（{hours}小时{minutes}分钟后）[/green]")
-                return delay
-            elif choice == "5":
-                return self._parse_custom_delay()
-            elif choice == "6":
-                return self._parse_target_datetime()
-            else:
-                console.print(f"[red]❌ 无效的选项: {choice}[/red]")
-                return self._select_schedule_time_interactive()
-                
-        except TimeoutError:
-            signal.alarm(0)
-            console.print("\n[yellow]⚠ 输入超时，将立即执行部署[/yellow]")
-            return 0
-        except KeyboardInterrupt:
-            signal.alarm(0)
-            console.print("\n[yellow]⚠ 操作已取消[/yellow]")
-            return None
-        except Exception as e:
-            signal.alarm(0)
-            console.print(f"[red]❌ 错误: {e}[/red]")
-            return self._select_schedule_time_interactive()
-    
-    def _parse_custom_delay(self) -> Optional[int]:
-        """
-        解析自定义延迟时间（分钟）
-        
-        Returns:
-            Optional[int]: 延迟秒数，None表示用户取消
-        """
-        console.print()
-        try:
-            minutes_str = Prompt.ask("[bold cyan]请输入延迟时间（分钟）[/bold cyan]")
-            minutes = int(minutes_str.strip())
-            
-            if minutes < 1:
-                console.print("[red]❌ 延迟时间必须大于等于 1 分钟[/red]")
-                return self._parse_custom_delay()
-            
-            if minutes > 10080:  # 7天
-                console.print("[red]❌ 延迟时间不能超过 7 天（10080 分钟）[/red]")
-                return self._parse_custom_delay()
-            
-            delay_seconds = minutes * 60
-            target_time = datetime.now() + timedelta(seconds=delay_seconds)
-            
-            hours = minutes // 60
-            mins = minutes % 60
-            if hours > 0:
-                time_str = f"{hours}小时{mins}分钟" if mins > 0 else f"{hours}小时"
-            else:
-                time_str = f"{mins}分钟"
-            
-            console.print(f"[green]✓ 将在 {time_str} 后执行（{target_time.strftime('%Y-%m-%d %H:%M:%S')}）[/green]")
-            return delay_seconds
-            
-        except ValueError:
-            console.print("[red]❌ 请输入有效的数字[/red]")
-            return self._parse_custom_delay()
-        except KeyboardInterrupt:
-            console.print("\n[yellow]⚠ 操作已取消[/yellow]")
-            return None
-    
-    def _parse_target_datetime(self) -> Optional[int]:
-        """
-        解析目标日期时间，返回延迟秒数
-        
-        Returns:
-            Optional[int]: 延迟秒数，None表示用户取消
-        """
-        console.print()
-        console.print("[cyan]请输入目标时间，支持以下格式：[/cyan]")
-        console.print("  • [yellow]HH:MM[/yellow]          - 今天的指定时间（如：15:30）")
-        console.print("  • [yellow]HH:MM:SS[/yellow]       - 今天的指定时间（如：15:30:00）")
-        console.print("  • [yellow]MM-DD HH:MM[/yellow]    - 指定日期时间（如：01-25 03:00）")
-        console.print("  • [yellow]YYYY-MM-DD HH:MM:SS[/yellow] - 完整日期时间（如：2026-01-25 03:00:00）")
-        console.print()
-        
-        try:
-            time_str = Prompt.ask("[bold cyan]请输入目标时间[/bold cyan]")
-            time_str = time_str.strip()
-            
-            now = datetime.now()
-            target_time = None
-            
-            # 尝试解析不同格式
-            formats = [
-                ("%H:%M", "今天"),
-                ("%H:%M:%S", "今天"),
-                ("%m-%d %H:%M", "今年"),
-                ("%Y-%m-%d %H:%M:%S", "完整"),
-                ("%Y-%m-%d %H:%M", "完整"),
-            ]
-            
-            for fmt, time_type in formats:
-                try:
-                    if time_type == "今天":
-                        parsed = datetime.strptime(time_str, fmt)
-                        target_time = now.replace(
-                            hour=parsed.hour,
-                            minute=parsed.minute,
-                            second=parsed.second if fmt == "%H:%M:%S" else 0,
-                            microsecond=0
-                        )
-                        # 如果时间已过，设置为明天
-                        if target_time <= now:
-                            target_time += timedelta(days=1)
-                    elif time_type == "今年":
-                        parsed = datetime.strptime(time_str, fmt)
-                        target_time = now.replace(
-                            month=parsed.month,
-                            day=parsed.day,
-                            hour=parsed.hour,
-                            minute=parsed.minute,
-                            second=0,
-                            microsecond=0
-                        )
-                        # 如果时间已过，设置为明年
-                        if target_time <= now:
-                            target_time = target_time.replace(year=target_time.year + 1)
-                    else:  # 完整
-                        target_time = datetime.strptime(time_str, fmt)
-                    
-                    break
-                except ValueError:
-                    continue
-            
-            if target_time is None:
-                console.print("[red]❌ 时间格式错误，请使用支持的格式[/red]")
-                return self._parse_target_datetime()
-            
-            # 检查目标时间是否已过期
-            if target_time <= now:
-                console.print(f"[red]❌ 目标时间 {target_time.strftime('%Y-%m-%d %H:%M:%S')} 已过期[/red]")
-                console.print(f"[red]   当前时间: {now.strftime('%Y-%m-%d %H:%M:%S')}[/red]")
-                return self._parse_target_datetime()
-            
-            # 计算延迟秒数
-            delay_seconds = int((target_time - now).total_seconds())
-            
-            # 检查是否超过7天
-            if delay_seconds > 604800:
-                console.print("[red]❌ 目标时间不能超过 7 天后[/red]")
-                return self._parse_target_datetime()
-            
-            # 格式化显示时间差
-            hours = delay_seconds // 3600
-            minutes = (delay_seconds % 3600) // 60
-            seconds = delay_seconds % 60
-            
-            if hours > 0:
-                time_diff = f"{hours}小时{minutes}分钟"
-            elif minutes > 0:
-                time_diff = f"{minutes}分钟{seconds}秒"
-            else:
-                time_diff = f"{seconds}秒"
-            
-            console.print(f"[green]✓ 将在 {target_time.strftime('%Y-%m-%d %H:%M:%S')} 执行（{time_diff}后）[/green]")
-            return delay_seconds
-            
-        except KeyboardInterrupt:
-            console.print("\n[yellow]⚠ 操作已取消[/yellow]")
-            return None
-        except Exception as e:
-            console.print(f"[red]❌ 解析错误: {e}[/red]")
-            return self._parse_target_datetime()
-    
-    def _countdown_wait(self, delay_seconds: int, server_config: Dict[str, Any],
-                       upload_types: Optional[List[str]], command_groups: Optional[List[str]]):
-        """
-        倒计时等待（支持 Ctrl+C 中断）
-        
-        Args:
-            delay_seconds: 延迟秒数
-            server_config: 服务器配置
-            upload_types: 应用类型列表
-            command_groups: 命令组列表
-        """
-        console.print()
-        
-        # 计算目标时间
-        target_time = datetime.now() + timedelta(seconds=delay_seconds)
-        
-        # 显示倒计时信息面板
-        info_lines = [
-            f"[cyan]目标时间:[/cyan] {target_time.strftime('%Y-%m-%d %H:%M:%S')}",
-            "",
-            "[cyan]部署信息:[/cyan]",
-            f"  • [yellow]服务器:[/yellow] {server_config['name']} ({server_config['host']}:{server_config['port']})",
-        ]
-        
-        if upload_types:
-            info_lines.append(f"  • [yellow]应用类型:[/yellow] {', '.join(upload_types)}")
-        
-        if command_groups:
-            info_lines.append(f"  • [yellow]命令组:[/yellow] {', '.join(command_groups)}")
-        
-        info_lines.append("")
-        info_lines.append("[dim]💡 提示: 按 Ctrl+C 可取消等待并立即执行[/dim]")
-        
-        panel = Panel(
-            "\n".join(info_lines),
-            title="⏰ 定时部署倒计时",
-            border_style="magenta",
-            padding=(1, 2)
-        )
-        
-        console.print(panel)
-        console.print()
-        
-        # 倒计时循环
-        try:
-            start_time = time.time()
-            
-            while True:
-                elapsed = time.time() - start_time
-                remaining = delay_seconds - int(elapsed)
-                
-                if remaining <= 0:
-                    break
-                
-                # 计算时分秒
-                hours = remaining // 3600
-                minutes = (remaining % 3600) // 60
-                seconds = remaining % 60
-                
-                # 格式化时间显示
-                if hours > 0:
-                    time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-                else:
-                    time_str = f"{minutes:02d}:{seconds:02d}"
-                
-                # 计算进度百分比
-                progress_percent = int((elapsed / delay_seconds) * 100)
-                
-                # 生成进度条（已完成部分用绿色，未完成部分用灰色）
-                bar_length = 50
-                filled_length = int(bar_length * progress_percent / 100)
-                filled_bar = f"[bold green]{'█' * filled_length}[/bold green]"
-                empty_bar = f"[grey62]{'░' * (bar_length - filled_length)}[/grey62]"
-                
-                # 显示倒计时（使用 \r 实现单行刷新）
-                console.print(
-                    f"⏰ 倒计时: [bold cyan]{time_str}[/bold cyan] "
-                    f"{filled_bar}{empty_bar} [bold yellow]{progress_percent}%[/bold yellow]",
-                    end="\r"
-                )
-                
-                time.sleep(1)
-            
-            # 倒计时结束
-            console.print("\n")
-            console.print("[green]✓ 倒计时结束，开始执行部署...[/green]")
-            console.print()
-            
-        except KeyboardInterrupt:
-            console.print("\n")
-            console.print("[yellow]⚠ 倒计时已取消，立即开始部署...[/yellow]")
-            console.print()
-    
-    def _execute_deployment(self, server_config: Dict[str, Any], 
-                           upload_types: Optional[List[str]],
-                           command_group: Optional[List[str]]) -> bool:
-        """执行部署（支持多个应用类型和多个命令组）"""
-        # 初始化结果字典（支持多应用和多命令组）
+        # 初始化结果字典（支持多应用）
         results = {
             'local_commands': {},  # {app_type: success}
             'uploads': {},         # {app_type: success}
-            'commands': {},        # {command_group: success}
-            'command_skipped': command_group is None or len(command_group) == 0
+            'command_success': False,
+            'command_skipped': command_group is None
         }
         
         # ========== 阶段 0: 执行本地命令（在连接服务器之前）==========
@@ -807,18 +423,8 @@ class RemoteDeployService:
                     console.print(f"[yellow]⚠ 跳过本地命令 ({upload_type})：未配置[/yellow]")
                     console.print()
         
-        # ========== 显示部署执行信息 ==========
-        console.print()
-        console.print(Panel.fit(
-            f"[bold yellow]开始部署[/bold yellow]\n"
-            f"[cyan]服务器:[/cyan] {server_config['name']}\n"
-            f"[cyan]地址:[/cyan] {server_config['host']}:{server_config['port']}\n"
-            f"[cyan]用户:[/cyan] {server_config['username']}",
-            border_style="magenta",
-            title="🚀 部署执行"
-        ))
-        
         # ========== 建立 SSH 连接（本地命令成功后才连接）==========
+        console.print()
         if not self._connect_to_server(server_config):
             return False
         
@@ -854,28 +460,19 @@ class RemoteDeployService:
             if command_group:
                 console.print()
                 console.print(Panel.fit(
-                    f"[bold yellow]阶段 2: 执行远程命令 ({', '.join(command_group)})[/bold yellow]",
+                    f"[bold yellow]阶段 2: 执行远程命令 ({command_group})[/bold yellow]",
                     border_style="blue",
                     title="⚙️  命令执行"
                 ))
                 console.print()
+                results['command_success'] = self._execute_commands(server_config, command_group)
                 
-                for idx, group in enumerate(command_group, 1):
-                    console.print(f"[bold cyan]▶ [{idx}/{len(command_group)}] 执行命令组: {group}[/bold cyan]")
-                    console.print()
-                    
-                    success = self._execute_commands(server_config, group)
-                    results['commands'][group] = success
-                    
-                    if not success:
-                        console.print(Panel.fit(
-                            f"[bold red]❌ 命令执行失败 ({group})，终止部署[/bold red]",
-                            border_style="red"
-                        ))
-                        return False
-                    
-                    console.print(f"[green]✓ 命令执行成功 ({group})[/green]")
-                    console.print()
+                if not results['command_success']:
+                    console.print(Panel.fit(
+                        "[bold red]❌ 命令执行失败[/bold red]",
+                        border_style="red"
+                    ))
+                    return False
             
             # 显示部署摘要
             self._show_deployment_summary(server_config, results, upload_types)
@@ -1105,7 +702,7 @@ class RemoteDeployService:
         return self.command_executor.execute_command_group(commands, command_group)
     
     def _show_deployment_summary(self, server_config: Dict[str, Any], results: Dict[str, Any], upload_types: Optional[List[str]]):
-        """显示部署摘要（支持多应用和多命令组）"""
+        """显示部署摘要（支持多应用）"""
         console.print()
         console.print(Panel.fit(
             "[bold yellow]部署摘要[/bold yellow]",
@@ -1145,11 +742,10 @@ class RemoteDeployService:
         else:
             table.add_row("文件上传", "[yellow]- 已跳过[/yellow]")
         
-        # 命令执行结果（多命令组）
+        # 命令执行结果
         if not results['command_skipped']:
-            for group, success in results['commands'].items():
-                status = "[green]✓ 成功[/green]" if success else "[red]✗ 失败[/red]"
-                table.add_row(f"远程命令 ({group})", status)
+            status = "[green]✓ 成功[/green]" if results['command_success'] else "[red]✗ 失败[/red]"
+            table.add_row("远程命令", status)
         else:
             table.add_row("远程命令", "[yellow]- 已跳过[/yellow]")
         
@@ -1164,8 +760,8 @@ class RemoteDeployService:
     
     def _show_dry_run_info(self, server_config: Dict[str, Any], 
                           upload_types: Optional[List[str]],
-                          command_group: Optional[List[str]]):
-        """显示模拟执行信息（支持多应用和多命令组）"""
+                          command_group: Optional[str]):
+        """显示模拟执行信息（支持多应用）"""
         # 创建基本信息表格
         table = Table(
             title="📋 服务器信息",
@@ -1264,33 +860,32 @@ class RemoteDeployService:
                 console.print()
         
         if command_group:
-            for idx, group in enumerate(command_group, 1):
-                console.print(Panel.fit(
-                    f"[bold yellow]命令组 [{idx}/{len(command_group)}]: {group}[/bold yellow]",
-                    border_style="blue",
-                    title="⚙️  命令任务"
-                ))
-                console.print()
-                
-                commands = server_config.get('commands', {}).get(group, [])
-                
-                # 创建命令表格
-                cmd_table = Table(
-                    box=box.ROUNDED,
-                    border_style="bright_blue",
-                    show_header=True,
-                    header_style="bold cyan",
-                    show_lines=True
-                )
-                
-                cmd_table.add_column("序号", justify="center", style="bold yellow", width=6, vertical="middle")
-                cmd_table.add_column("命令", style="green", width=80, vertical="middle")
-                
-                for cmd_idx, cmd in enumerate(commands, 1):
-                    cmd_table.add_row(str(cmd_idx), cmd)
-                
-                console.print(cmd_table)
-                console.print()
+            console.print(Panel.fit(
+                f"[bold yellow]命令组: {command_group}[/bold yellow]",
+                border_style="blue",
+                title="⚙️  命令任务"
+            ))
+            console.print()
+            
+            commands = server_config.get('commands', {}).get(command_group, [])
+            
+            # 创建命令表格
+            cmd_table = Table(
+                box=box.ROUNDED,
+                border_style="bright_blue",
+                show_header=True,
+                header_style="bold cyan",
+                show_lines=True
+            )
+            
+            cmd_table.add_column("序号", justify="center", style="bold yellow", width=6, vertical="middle")
+            cmd_table.add_column("命令", style="green", width=80, vertical="middle")
+            
+            for idx, cmd in enumerate(commands, 1):
+                cmd_table.add_row(str(idx), cmd)
+            
+            console.print(cmd_table)
+            console.print()
         
         console.print(Panel.fit(
             "[bold green]✓ 模拟执行完成（未实际执行）[/bold green]",

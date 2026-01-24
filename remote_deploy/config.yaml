@@ -24,6 +24,7 @@ servers:
         commands:
           - npm install
           - npm run build:prod
+          - tar  --no-xattrs -czf dist-prod.tar.gz -C dist-prod .
     # 文件上传可以自定义项目，例如：backend、frontend、admin、、static、worker等
     upload:
       # 后端接口服务
@@ -34,17 +35,19 @@ servers:
         - local_path: ~/Desktop/test.sh
           remote_path: /home/admin/web_projects/dccw/server-api/bin/
       
+      # 前端后台管理页面
+      frontend_admin: 
+        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod.tar.gz
+          remote_path: /home/admin/web_projects/dccw/server-backui/
+          mode: sync   # 或者使用 copy ，如果使用 sync 则服务器完全同步本地目录。
+          delete_extra: true # 设置为 true 可以删除服务器该目录上多余的旧文件，它只在 mode: sync 时才有意义。
+
       # 前端静态页面  
       frontend_static: 
         - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
           remote_path: /home/admin/web_projects/dccw/server-backui/
 
-      # 前端后台管理页面
-      frontend_admin: 
-        - local_path: ~/workspace/ling_hang/ling_hang_admin/dist-prod/
-          remote_path: /home/admin/web_projects/dccw/server-backui/
-          mode: sync   # 或者使用 copy ，如果使用 sync 则服务器完全同步本地目录。
-          delete_extra: true # 设置为 true 可以删除服务器该目录上多余的旧文件，它只在 mode: sync 时才有意义。
+
 
     # 远程服务器需要执行的命令
     commands:
@@ -52,6 +55,12 @@ servers:
       backend_api:
         - cd /home/admin/web_projects/dccw/server-api/bin
         - sh test.sh
+      frontend_admin:
+        - cd /home/admin/web_projects/dccw/server-backui/
+        - tar -xzf dist-prod.tar.gz
+        # - rm dist-prod.tar.gz  # 可选：删除压缩包
+        - mv dist-prod.tar.gz dist-prod-$(date +%m%d%H%M).tar.gz           # 1. 给压缩包加上当前时间后缀防止覆盖
+        # - echo "✓ 部署完成，压缩包已保存为 dist-prod-$(date +%m%d%H%M).tar.gz" # 2. 输出提示信息
   # ======================================================================================================
 
 
