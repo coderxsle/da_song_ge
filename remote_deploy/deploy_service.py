@@ -72,9 +72,22 @@ class RemoteDeployService:
             title="🚀 部署工具"
         ))
         
-        # 加载配置（如果没有指定配置文件，ConfigManager 会使用默认路径）
+        # 加载配置（如果没有指定配置文件，ConfigManager 会使用用户配置文件）
         config_manager = ConfigManager(config_path)
         if not config_manager.load_config():
+            console.print()
+            console.print(Panel.fit(
+                f"[bold red]❌ 配置文件加载失败[/bold red]\n\n"
+                f"[yellow]配置文件位置:[/yellow]\n"
+                f"  {config_manager.config_path}\n\n"
+                f"[yellow]请检查:[/yellow]\n"
+                f"  1. 配置文件是否存在\n"
+                f"  2. 配置文件格式是否正确\n"
+                f"  3. 是否已填写服务器信息",
+                border_style="red",
+                title="❌ 配置错误"
+            ))
+            console.print()
             return False
         
         # 创建部署服务实例

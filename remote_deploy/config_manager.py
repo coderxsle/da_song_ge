@@ -7,32 +7,165 @@
 """
 
 import os
+import sys
 import yaml
+import shutil
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from common.log_utils import log_info, log_warn, log_error
 from common.path_utils import expand_path, validate_path
 from rich.console import Console
+from rich.panel import Panel
 
 console = Console()
 
 class ConfigManager:
     """配置管理器类"""
     
+    # 用户配置目录
+    USER_CONFIG_DIR = Path.home() / '.coderxslee'
+    USER_CONFIG_FILE = USER_CONFIG_DIR / 'config.yaml'
+    
     # 默认配置文件路径（类变量）
     DEFAULT_CONFIG_PATH = Path(__file__).parent / 'config.yaml'
+    
+    @staticmethod
+    def get_resource_path(relative_path: str) -> Path:
+        """
+        获取资源文件路径（支持打包后的程序）
+        
+        Args:
+            relative_path: 相对路径
+            
+        Returns:
+            Path: 资源文件的绝对路径
+        """
+        try:
+            # PyInstaller 打包后，资源文件在 sys._MEIPASS 目录
+            # 使用 getattr 避免类型检查器警告
+            base_path = Path(getattr(sys, '_MEIPASS', Path(__file__).parent.parent))
+        except Exception:
+            # 开发环境，使用当前文件所在目录
+            base_path = Path(__file__).parent.parent
+        
+        return base_path / relative_path
+    
+    @staticmethod
+    def ensure_user_config() -> Path:
+        """
+        确保用户配置文件存在
+        如果不存在，则从示例文件创建
+        
+        Returns:
+            Path: 用户配置文件路径
+        """
+        # 创建配置目录
+        ConfigManager.USER_CONFIG_DIR.mkdir(parents=True, exist_ok=True)
+        
+        # 如果用户配置文件不存在，从示例文件复制
+        if not ConfigManager.USER_CONFIG_FILE.exists():
+            console.print()
+            console.print(Panel.fit(
+                "[bold yellow]首次运行，正在创建配置文件...[/bold yellow]",
+                border_style="cyan",
+                title="⚙️  初始化配置"
+            ))
+            console.print()
+            
+            # 尝试从多个位置查找示例配置文件
+            example_locations = [
+                # 打包后的位置
+                ConfigManager.get_resource_path('remote_deploy/config.yaml.example'),
+                # 开发环境位置
+                Path(__file__).parent / 'config.yaml.example',
+            ]
+            
+            example_file = None
+            for location in example_locations:
+                if location.exists():
+                    example_file = location
+                    break
+            
+            if example_file and example_file.exists():
+                # 复制示例文件到用户配置目录
+                shutil.copy(example_file, ConfigManager.USER_CONFIG_FILE)
+                console.print(f"[green]✓ 配置文件已创建:[/green] {ConfigManager.USER_CONFIG_FILE}")
+                console.print()
+                console.print(Panel.fit(
+                    f"[bold cyan]请编辑配置文件并填入您的服务器信息：[/bold cyan]\n\n"
+                    f"[yellow]配置文件位置:[/yellow]\n"
+                    f"  {ConfigManager.USER_CONFIG_FILE}\n\n"
+                    f"[yellow]编辑命令示例:[/yellow]\n"
+                    f"  vim {ConfigManager.USER_CONFIG_FILE}\n"
+                    f"  nano {ConfigManager.USER_CONFIG_FILE}\n"
+                    f"  open {ConfigManager.USER_CONFIG_FILE}",
+                    border_style="cyan",
+                    title="📝 配置说明"
+                ))
+                console.print()
+            else:
+                # 如果找不到示例文件，创建一个基本的配置文件
+                console.print("[yellow]⚠ 未找到示例配置文件，创建基本配置...[/yellow]")
+                basic_config = {
+                    'license_key': '请填写您的授权密钥',
+                    'servers': [
+                        {
+                            'name': '示例服务器',
+                            'host': '192.168.1.100',
+                            'port': 22,
+                            'username': 'root',
+                            'auth': {
+                                'type': 'ssh_key',
+                                'key_path': '~/.ssh/id_rsa',
+                                'password': ''
+                            },
+                            'upload': {
+                                'backend': [
+                                    {
+                                        'local_path': '~/project/dist/',
+                                        'remote_path': '/opt/app/'
+                                    }
+                                ]
+                            },
+                            'commands': {
+                                'restart': [
+                                    'cd /opt/app',
+                                    'systemctl restart app'
+                                ]
+                            }
+                        }
+                    ]
+                }
+                
+                with open(ConfigManager.USER_CONFIG_FILE, 'w', encoding='utf-8') as f:
+                    yaml.dump(basic_config, f, allow_unicode=True, default_flow_style=False)
+                
+                console.print(f"[green]✓ 基本配置文件已创建:[/green] {ConfigManager.USER_CONFIG_FILE}")
+                console.print()
+                console.print(Panel.fit(
+                    "[bold yellow]⚠ 请先编辑配置文件，填入正确的服务器信息后再运行！[/bold yellow]",
+                    border_style="yellow",
+                    title="⚠️  重要提示"
+                ))
+                console.print()
+        
+        return ConfigManager.USER_CONFIG_FILE
     
     def __init__(self, config_path: Optional[str] = None):
         """
         初始化配置管理器
         
         Args:
-            config_path: 配置文件路径（可选，默认使用 DEFAULT_CONFIG_PATH）
+            config_path: 配置文件路径（可选，默认使用用户配置文件）
         """
         if config_path is None:
-            config_path = str(self.DEFAULT_CONFIG_PATH)
+            # 优先使用用户配置文件
+            config_path = str(self.ensure_user_config())
+        else:
+            # 如果指定了配置文件，展开路径
+            config_path = expand_path(config_path)
         
-        self.config_path = expand_path(config_path)
+        self.config_path = config_path
         self.config: Optional[Dict[str, Any]] = None
     
     def load_config(self) -> bool:

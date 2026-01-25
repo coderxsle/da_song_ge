@@ -1,0 +1,107 @@
+name: Build Executables
+
+on:
+  push:
+    tags:
+      - 'v*'  # 当推送 v* 标签时触发（如 v1.0.0）
+  workflow_dispatch:  # 允许手动触发
+
+jobs:
+  build-windows:
+    name: Build for Windows
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+      
+      - name: Build Windows executable
+        run: python build.py
+      
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-executable
+          path: dist/*.exe
+          retention-days: 30
+
+  build-macos:
+    name: Build for macOS
+    runs-on: macos-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install pyinstaller
+          pip install -r requirements.txt
+      
+      - name: Build macOS executable
+        run: python build.py
+      
+      - name: Create DMG (optional)
+        run: |
+          # 如果需要创建 DMG 安装包，可以使用 create-dmg
+          # brew install create-dmg
+          # create-dmg --volname "李雪松工具集" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 "李雪松工具集.dmg" "dist/李雪松工具集.app"
+          echo "Skipping DMG creation"
+      
+      - name: Upload macOS artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-executable
+          path: |
+            dist/李雪松工具集
+            dist/李雪松工具集.app
+          retention-days: 30
+
+  create-release:
+    name: Create Release
+    needs: [build-windows, build-macos]
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-executable
+          path: ./windows
+      
+      - name: Download macOS artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-executable
+          path: ./macos
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          files: |
+            windows/*
+            macos/*
+          draft: false
+          prerelease: false
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

@@ -63,20 +63,21 @@ def show_menu():
 
 def run_remote_deploy():
     """运行远程部署"""
-    console.print(Panel.fit(
-        "🚀 启动远程部署...",
-        border_style="green",
-        title="远程部署"
-    ))
-    console.print()
+    console.clear()
     
     try:
-        # 运行远程部署脚本
-        subprocess.run([sys.executable, "remote_deploy/deploy_service.py"], check=True)
-    except subprocess.CalledProcessError as e:
-        console.print(f"[red]❌ 运行失败: {e}[/red]")
-    except FileNotFoundError:
-        console.print("[red]❌ 找不到远程部署文件[/red]")
+        # 直接导入并调用部署服务（支持打包后的程序）
+        from remote_deploy.deploy_service import RemoteDeployService
+        
+        # 执行部署
+        RemoteDeployService.deploy()
+        
+    except KeyboardInterrupt:
+        console.print("\n\n[yellow]⚠ 操作已取消[/yellow]")
+    except Exception as e:
+        console.print(f"\n[red]❌ 发生错误: {e}[/red]")
+        import traceback
+        traceback.print_exc()
     
     console.print()
     input("按回车键继续...")

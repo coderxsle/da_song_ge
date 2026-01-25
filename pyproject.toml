@@ -64,8 +64,7 @@ examples = [
 # ============================================
 [project.scripts]
 # 安装后可以直接在终端使用 'deploy-tool' 命令
-# 它会执行 deploy_tool.scripts.main 模块中的 app 函数
-deploy-tool = "deploy_tool.scripts.main:app"
+deploy-tool = "main:app"
 
 # ============================================
 # 构建系统配置
@@ -78,8 +77,4 @@ build-backend = "hatchling.build"       # 指定构建后端
 # 打包配置
 # ============================================
 [tool.hatch.build.targets.wheel]
-packages = ["deploy_tool"]              # 指定要打包的目录
-
-# 强制包含配置文件目录
-[tool.hatch.build.targets.wheel.force-include]
-"deploy_tool/config" = "deploy_tool/config"  # 确保配置文件被打包进去
+packages = ["remote_deploy", "common", "examples"]  # 指定要打包的目录
