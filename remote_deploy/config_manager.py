@@ -22,7 +22,7 @@ class ConfigManager:
     # 默认配置文件路径（类变量）
     DEFAULT_CONFIG_PATH = Path(__file__).parent / 'config.yaml'
     
-    def __init__(self, config_path: str = None):
+    def __init__(self, config_path: Optional[str] = None):
         """
         初始化配置管理器
         
@@ -314,6 +314,15 @@ class ConfigManager:
             if server['name'] == name:
                 return server
         return None
+    
+    def get_license_key(self) -> Optional[str]:
+        """
+        获取授权密钥
+        
+        Returns:
+            Optional[str]: 授权密钥，如果未配置则返回 None
+        """
+        return self.config.get('license_key') if self.config else None
     
     @staticmethod
     def expand_path(path: str) -> str:

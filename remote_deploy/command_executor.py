@@ -49,15 +49,12 @@ class CommandExecutor:
         for idx, command in enumerate(commands, 1):
             log_info(f"[{idx}/{len(commands)}] 执行命令: {command}")
             
-            success, output, exit_code = self._execute_single_command(command)
+            # hide=False 会实时显示输出
+            success, output, exit_code = self._execute_single_command(command, hide=False)
             
             if not success:
                 self._handle_command_failure(command, exit_code, output)
                 return False
-            
-            # 显示命令输出（如果有）
-            if output and output.strip():
-                print(output)
         
         log_info(f"命令组 '{group_name}' 执行成功")
         return True
@@ -82,32 +79,30 @@ class CommandExecutor:
         
         log_info("在同一会话中执行所有命令...")
         
-        success, output, exit_code = self._execute_single_command(combined_command)
+        # hide=False 会实时显示输出，所以不需要再 print(output)
+        success, output, exit_code = self._execute_single_command(combined_command, hide=False)
         
         if not success:
             self._handle_command_failure(combined_command, exit_code, output)
             return False
         
-        # 显示命令输出（如果有）
-        if output and output.strip():
-            print(output)
-        
         log_info(f"命令组 '{group_name}' 执行成功")
         return True
     
-    def _execute_single_command(self, command: str) -> Tuple[bool, str, int]:
+    def _execute_single_command(self, command: str, hide: bool = False) -> Tuple[bool, str, int]:
         """
         执行单条命令
         
         Args:
             command: 要执行的命令
+            hide: 是否隐藏输出（True 时不实时显示，False 时实时显示）
             
         Returns:
             Tuple[bool, str, int]: (是否成功, 输出, 退出码)
         """
         try:
-            # 执行命令（不隐藏输出）
-            result = self.ssh_client.run(command, hide=False)
+            # 执行命令
+            result = self.ssh_client.run(command, hide=hide)
             
             # 处理返回结果
             if result is None:

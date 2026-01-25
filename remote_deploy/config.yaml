@@ -1,4 +1,4 @@
-
+license_key: 8k9D7s8571
 servers:
   # ======================================================================================================
   #                                              领航不良资产测试                                               
@@ -51,16 +51,15 @@ servers:
 
     # 远程服务器需要执行的命令
     commands:
-      # 后端执行命令
-      backend_api:
-        - cd /home/admin/web_projects/dccw/server-api/bin
-        - sh test.sh
       frontend_admin:
         - cd /home/admin/web_projects/dccw/server-backui/
         - tar -xzf dist-prod.tar.gz
         # - rm dist-prod.tar.gz  # 可选：删除压缩包
-        - mv dist-prod.tar.gz dist-prod-$(date +%m%d%H%M).tar.gz           # 1. 给压缩包加上当前时间后缀防止覆盖
-        # - echo "✓ 部署完成，压缩包已保存为 dist-prod-$(date +%m%d%H%M).tar.gz" # 2. 输出提示信息
+        - mv dist-prod.tar.gz dist-prod-$(date +%m%d%H%M).tar.gz # 1. 给压缩包加上当前时间后缀防止覆盖
+        - echo -e "\033[32m✓ 部署完成，压缩包已保存为 dist-prod-$(date +%m%d%H%M).tar.gz\033[0m"
+      backend_api:
+        - cd /home/admin/web_projects/dccw/server-api/bin
+        - sh test.sh
   # ======================================================================================================
 
 

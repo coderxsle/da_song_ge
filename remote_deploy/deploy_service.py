@@ -19,6 +19,7 @@ from remote_deploy.file_uploader import FileUploader
 from remote_deploy.command_executor import CommandExecutor
 from remote_deploy.local_command_executor import LocalCommandExecutor
 from remote_deploy.validate_config import show_servers_table
+from remote_deploy.license_validator import LicenseValidator
 from rich.console import Console
 from rich.panel import Panel
 from rich.table import Table
@@ -46,10 +47,10 @@ class RemoteDeployService:
         self.local_command_executor: Optional[LocalCommandExecutor] = None
     
     @staticmethod
-    def deploy(config_path: str = None, 
+    def deploy(config_path: Optional[str] = None, 
                server_name: Optional[str] = None,
                upload_types: Optional[List[str]] = None,
-               command_group: Optional[str] = None,
+               command_group: Optional[List[str]] = None,
                dry_run: bool = False) -> bool:
         """
         部署入口方法
@@ -58,7 +59,7 @@ class RemoteDeployService:
             config_path: 配置文件路径（可选，默认使用 ConfigManager.DEFAULT_CONFIG_PATH）
             server_name: 服务器名称（可选）
             upload_types: 应用类型列表（可选，支持多个）
-            command_group: 命令组名称（可选）
+            command_group: 命令组列表（可选，支持多个）
             dry_run: 是否模拟执行
             
         Returns:
@@ -115,7 +116,7 @@ class RemoteDeployService:
             ))
             return False
         
-        # 选择定时部署（新增）
+        # 选择定时部署
         delay_seconds = service._select_schedule_time_interactive()
         if delay_seconds is None:
             # 用户取消操作
@@ -134,6 +135,25 @@ class RemoteDeployService:
             ))
             service._show_dry_run_info(server_config, upload_types, command_group)
             return True
+        
+        # 验证授权密钥（在选择定时之后、倒计时之前）
+        license_key = config_manager.get_license_key()
+        if not license_key:
+            console.print(Panel.fit(
+                "[bold red]❌ 配置文件中未找到授权密钥 (license_key)[/bold red]",
+                border_style="red"
+            ))
+            return False
+        
+        validator = LicenseValidator(license_key)
+        success, data, error_msg = validator.validate()
+        
+        if not success:
+            validator.show_error(error_msg, data)
+            return False
+        
+        # 显示授权信息
+        validator.show_license_info(data)
         
         # 如果设置了延迟，进行倒计时等待
         if delay_seconds > 0:
@@ -196,12 +216,12 @@ class RemoteDeployService:
             border_style="bright_blue",
             show_header=True,
             header_style="bold cyan",
-            show_lines=True
+            # show_lines=True
         )
         
-        table.add_column("序号", justify="center", style="bold yellow", width=6, vertical="middle")
-        table.add_column("应用类型", style="bold green", width=30, vertical="middle")
-        table.add_column("任务数量", style="cyan", width=15, vertical="middle")
+        table.add_column("序号", justify="center", style="bold yellow", width=4, vertical="middle")
+        table.add_column("应用类型", style="bold green", width=20, vertical="middle")
+        table.add_column("任务数量", style="cyan", width=10, vertical="middle")
         
         for idx, upload_type in enumerate(upload_types, 1):
             file_count = len(upload_config[upload_type])
@@ -213,8 +233,8 @@ class RemoteDeployService:
         
         # 添加全选和跳过选项
         table.add_row(
-            "all",
-            "[green]全部部署[/green]",
+            "a",
+            "[green]全部[/green]",
             f"{len(upload_types)} 个应用"
         )
         table.add_row(
@@ -224,13 +244,13 @@ class RemoteDeployService:
         )
         
         console.print(table)
-        console.print()
         
         # 循环直到用户输入有效选择或取消
         while True:
             try:
+                console.print(f"[green]用逗号或空格分隔，如: 1,2 或 1 2 或输入 a 全选:[/green]")
                 choice = Prompt.ask(
-                    "[bold cyan]请选择应用类型编号（多选用逗号或空格分隔，如: 1,2 或 1 2 或输入 all 全选）[/bold cyan]"
+                    "[bold cyan]请选择应用类型编号[/bold cyan]"
                 )
                 
                 # 处理跳过
@@ -239,7 +259,7 @@ class RemoteDeployService:
                     return None
                 
                 # 处理全选
-                if choice.strip().lower() == 'all':
+                if choice.strip().lower() == 'a':
                     console.print(f"[green]✓ 已选择部署应用:[/green] [bold]{', '.join(upload_types)}[/bold]")
                     return upload_types
                 
@@ -308,7 +328,6 @@ class RemoteDeployService:
             border_style="magenta",
             title="⚙️  命令选择"
         ))
-        console.print()
         
         # 创建命令组表格
         table = Table(
@@ -319,8 +338,8 @@ class RemoteDeployService:
             show_lines=True
         )
         
-        table.add_column("序号", justify="center", style="bold yellow", width=6, vertical="middle")
-        table.add_column("命令组", style="bold green", width=25, vertical="middle")
+        table.add_column("序号", justify="center", style="bold yellow", width=4, vertical="middle")
+        table.add_column("命令组", style="bold green", width=16, vertical="middle")
         table.add_column("命令语句", style="cyan", width=60, vertical="middle")
         
         for idx, group in enumerate(command_groups, 1):
@@ -335,7 +354,7 @@ class RemoteDeployService:
         
         # 添加全选和跳过选项
         table.add_row(
-            "all",
+            "a",
             "[green]全部执行[/green]",
             f"{len(command_groups)} 个命令组"
         )
@@ -344,15 +363,14 @@ class RemoteDeployService:
             "[yellow]跳过命令执行[/yellow]",
             "-"
         )
-        
         console.print(table)
-        console.print()
         
         # 循环直到用户输入有效选择或取消
         while True:
             try:
+                console.print(f"[green]用逗号或空格分隔，如: 1,2 或 1 2 或输入 a 全选:[/green]")
                 choice = Prompt.ask(
-                    "[bold cyan]请选择命令组编号（多选用逗号或空格分隔，如: 1,2 或 1 2 或输入 all 全选）[/bold cyan]"
+                    "[bold cyan]请选择应用类型编号[/bold cyan]"
                 )
                 
                 # 处理跳过
@@ -361,7 +379,7 @@ class RemoteDeployService:
                     return None
                 
                 # 处理全选
-                if choice.strip().lower() == 'all':
+                if choice.strip().lower() == 'a':
                     console.print(f"[green]✓ 已选择执行命令组:[/green] [bold]{', '.join(command_groups)}[/bold]")
                     return command_groups
                 
@@ -444,12 +462,14 @@ class RemoteDeployService:
         table.add_column("说明", style="bold green", width=50, vertical="middle")
         
         table.add_row("0", "立即执行（默认）")
-        table.add_row("1", "30分钟后执行")
-        table.add_row("2", "1小时后执行")
-        table.add_row("3", f"次日凌晨 03:00 执行 ({tomorrow_3am.strftime('%Y-%m-%d %H:%M:%S')})")
-        table.add_row("4", f"次日凌晨 05:00 执行 ({tomorrow_5am.strftime('%Y-%m-%d %H:%M:%S')})")
-        table.add_row("5", "自定义延迟时间（分钟）")
-        table.add_row("6", "自定义目标时间（日期时间）")
+        table.add_row("1", "1分钟后执行")
+        table.add_row("2", "5分钟后执行")
+        table.add_row("3", "30分钟后执行")
+        table.add_row("4", "1小时后执行")
+        table.add_row("5", f"次日凌晨 03:00 执行 ({tomorrow_3am.strftime('%Y-%m-%d %H:%M:%S')})")
+        table.add_row("6", f"次日凌晨 05:00 执行 ({tomorrow_5am.strftime('%Y-%m-%d %H:%M:%S')})")
+        table.add_row("7", "自定义延迟时间（分钟）")
+        table.add_row("8", "自定义目标时间（日期时间）")
         
         console.print(table)
         console.print()
@@ -478,12 +498,18 @@ class RemoteDeployService:
                 console.print("[green]✓ 将立即执行部署[/green]")
                 return 0
             elif choice == "1":
+                console.print("[green]✓ 将在 1 分钟后执行[/green]")
+                return 60
+            elif choice == "2":
+                console.print("[green]✓ 将在 5 分钟后执行[/green]")
+                return 300
+            elif choice == "3":
                 console.print("[green]✓ 将在 30 分钟后执行[/green]")
                 return 1800
-            elif choice == "2":
+            elif choice == "4":
                 console.print("[green]✓ 将在 1 小时后执行[/green]")
                 return 3600
-            elif choice == "3":
+            elif choice == "5":
                 delay = int((tomorrow_3am - now).total_seconds())
                 if delay <= 0:
                     console.print("[red]❌ 目标时间已过期[/red]")
@@ -492,7 +518,7 @@ class RemoteDeployService:
                 minutes = (delay % 3600) // 60
                 console.print(f"[green]✓ 将在次日凌晨 03:00 执行（{hours}小时{minutes}分钟后）[/green]")
                 return delay
-            elif choice == "4":
+            elif choice == "6":
                 delay = int((tomorrow_5am - now).total_seconds())
                 if delay <= 0:
                     console.print("[red]❌ 目标时间已过期[/red]")
@@ -501,9 +527,9 @@ class RemoteDeployService:
                 minutes = (delay % 3600) // 60
                 console.print(f"[green]✓ 将在次日凌晨 05:00 执行（{hours}小时{minutes}分钟后）[/green]")
                 return delay
-            elif choice == "5":
+            elif choice == "7":
                 return self._parse_custom_delay()
-            elif choice == "6":
+            elif choice == "8":
                 return self._parse_target_datetime()
             else:
                 console.print(f"[red]❌ 无效的选项: {choice}[/red]")
@@ -717,9 +743,6 @@ class RemoteDeployService:
                 elapsed = time.time() - start_time
                 remaining = delay_seconds - int(elapsed)
                 
-                if remaining <= 0:
-                    break
-                
                 # 计算时分秒
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
@@ -747,10 +770,20 @@ class RemoteDeployService:
                     end="\r"
                 )
                 
+                # 检查是否结束（在显示后检查，确保显示最后一秒）
+                if remaining <= 0:
+                    break
+                
                 time.sleep(1)
             
-            # 倒计时结束
-            console.print("\n")
+            # 显示最后的 100% 进度
+            bar_length = 50
+            filled_bar = f"[bold green]{'█' * bar_length}[/bold green]"
+            console.print(
+                f"⏰ 倒计时: [bold cyan]00:00[/bold cyan] "
+                f"{filled_bar} [bold yellow]100%[/bold yellow]"
+            )
+            console.print()
             console.print("[green]✓ 倒计时结束，开始执行部署...[/green]")
             console.print()
             

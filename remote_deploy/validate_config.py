@@ -8,6 +8,7 @@
 
 import sys
 from pathlib import Path
+from typing import Optional
 
 # 添加项目根目录到 Python 路径
 project_root = Path(__file__).parent.parent
@@ -23,7 +24,7 @@ from rich import box
 console = Console()
 
 
-def show_servers_table(servers: list, title: str = None):
+def show_servers_table(servers: list, title: Optional[str] = None):
     """
     显示服务器配置表格
     
