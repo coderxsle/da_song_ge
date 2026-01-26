@@ -443,7 +443,7 @@ class RemoteDeployService:
     
     def _select_schedule_time_interactive(self) -> Optional[int]:
         """
-        交互式选择定时部署时间（60秒超时）
+        交互式选择定时部署时间
         
         Returns:
             Optional[int]: 延迟秒数，0表示立即执行，None表示用户取消
@@ -487,22 +487,11 @@ class RemoteDeployService:
         console.print(table)
         console.print()
         
-        # 使用信号处理超时（60秒）
-        def timeout_handler(signum, frame):
-            raise TimeoutError()
-        
         try:
-            # 设置60秒超时
-            signal.signal(signal.SIGALRM, timeout_handler)
-            signal.alarm(60)
-            
             choice = Prompt.ask(
-                "[bold cyan]请选择定时选项（60秒内无输入将立即执行）[/bold cyan]",
+                "[bold cyan]请选择定时选项[/bold cyan]",
                 default="0"
             )
-            
-            # 取消超时
-            signal.alarm(0)
             
             choice = choice.strip()
             
@@ -548,16 +537,10 @@ class RemoteDeployService:
                 console.print(f"[red]❌ 无效的选项: {choice}[/red]")
                 return self._select_schedule_time_interactive()
                 
-        except TimeoutError:
-            signal.alarm(0)
-            console.print("\n[yellow]⚠ 输入超时，将立即执行部署[/yellow]")
-            return 0
         except KeyboardInterrupt:
-            signal.alarm(0)
             console.print("\n[yellow]⚠ 操作已取消[/yellow]")
             return None
         except Exception as e:
-            signal.alarm(0)
             console.print(f"[red]❌ 错误: {e}[/red]")
             return self._select_schedule_time_interactive()
     
