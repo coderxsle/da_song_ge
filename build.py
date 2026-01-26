@@ -66,7 +66,7 @@ def build_executable():
         pyinstaller_cmd,
         "--name", app_name,
         "--onefile",  # 打包成单个文件
-        "--windowed" if platform_name == "windows" else "--console",  # Windows 使用窗口模式
+        "--console",  # 使用控制台模式（命令行工具）
         "--clean",  # 清理临时文件
         "--noconfirm",  # 不询问确认
         

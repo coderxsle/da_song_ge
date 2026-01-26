@@ -25,15 +25,23 @@ jobs:
           python -m pip install --upgrade pip
           pip install pyinstaller
           pip install -r requirements.txt
+        shell: bash
       
       - name: Build Windows executable
         run: python build.py
+        shell: bash
+      
+      - name: List dist directory
+        run: |
+          echo "Contents of dist directory:"
+          dir dist
+        shell: cmd
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-executable
-          path: dist/*.exe
+          path: dist/李雪松工具集.exe
           retention-days: 30
 
   build-macos:
@@ -58,20 +66,22 @@ jobs:
       - name: Build macOS executable
         run: python build.py
       
-      - name: Create DMG (optional)
+      - name: List dist directory
         run: |
-          # 如果需要创建 DMG 安装包，可以使用 create-dmg
-          # brew install create-dmg
-          # create-dmg --volname "李雪松工具集" --window-pos 200 120 --window-size 800 400 --icon-size 100 --app-drop-link 600 185 "李雪松工具集.dmg" "dist/李雪松工具集.app"
-          echo "Skipping DMG creation"
+          echo "Contents of dist directory:"
+          ls -la dist/
+      
+      - name: Create ZIP archive
+        run: |
+          cd dist
+          zip -r 李雪松工具集-macos.zip 李雪松工具集
+          cd ..
       
       - name: Upload macOS artifact
         uses: actions/upload-artifact@v4
         with:
           name: macos-executable
-          path: |
-            dist/李雪松工具集
-            dist/李雪松工具集.app
+          path: dist/李雪松工具集-macos.zip
           retention-days: 30
 
   create-release:
@@ -85,23 +95,58 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: windows-executable
-          path: ./windows
+          path: ./artifacts/windows
       
       - name: Download macOS artifact
         uses: actions/download-artifact@v4
         with:
           name: macos-executable
-          path: ./macos
+          path: ./artifacts/macos
+      
+      - name: List artifacts
+        run: |
+          echo "Windows artifacts:"
+          ls -la ./artifacts/windows/
+          echo ""
+          echo "macOS artifacts:"
+          ls -la ./artifacts/macos/
       
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            windows/*
-            macos/*
+            ./artifacts/windows/李雪松工具集.exe
+            ./artifacts/macos/李雪松工具集-macos.zip
           draft: false
           prerelease: false
           generate_release_notes: true
+          body: |
+            ## 🎉 李雪松工具集 ${{ github.ref_name }}
+            
+            ### 📦 下载说明
+            
+            **Windows 用户：**
+            - 下载 `李雪松工具集.exe`
+            - 双击运行即可
+            
+            **macOS 用户：**
+            - 下载 `李雪松工具集-macos.zip`
+            - 解压后运行 `李雪松工具集`
+            - 如遇安全提示，执行：`xattr -cr 李雪松工具集`
+            
+            ### ⚙️ 首次运行
+            
+            1. 程序会自动创建配置文件：
+               - Windows: `%USERPROFILE%\.coderxslee\config.yaml`
+               - macOS: `~/.coderxslee/config.yaml`
+            
+            2. 编辑配置文件，填入您的服务器信息
+            
+            3. 再次运行程序即可使用
+            
+            ### 📚 文档
+            
+            详细使用说明请查看项目 README.md
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
