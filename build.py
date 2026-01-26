@@ -83,6 +83,8 @@ def build_executable():
         
         # 隐藏导入（确保所有依赖都被打包）
         "--hidden-import", "rich",
+        "--hidden-import", "rich._unicode_data",
+        "--hidden-import", "rich._unicode_data.unicode17_0_0",
         "--hidden-import", "yaml",
         "--hidden-import", "paramiko",
         "--hidden-import", "scp",
@@ -91,6 +93,7 @@ def build_executable():
         "--hidden-import", "docker",
         "--hidden-import", "pydantic",
         "--hidden-import", "dotenv",
+        "--collect-all", "rich",
         
         # 主脚本
         main_script
