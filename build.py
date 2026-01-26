@@ -12,6 +12,12 @@ import platform
 import subprocess
 from pathlib import Path
 
+# 设置 Windows 控制台编码为 UTF-8
+if platform.system() == 'Windows':
+    import io
+    sys.stdout = io.TextIOWrapper(sys.stdout.buffer, encoding='utf-8')
+    sys.stderr = io.TextIOWrapper(sys.stderr.buffer, encoding='utf-8')
+
 def get_platform_name():
     """获取当前平台名称"""
     system = platform.system().lower()
