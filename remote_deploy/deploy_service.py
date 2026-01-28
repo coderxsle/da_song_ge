@@ -10,6 +10,7 @@ import os
 import sys
 import time
 import signal
+import threading
 from datetime import datetime, timedelta
 from typing import Optional, Dict, List, Any
 from common.ssh_client import SSHClient
@@ -28,6 +29,66 @@ from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
 from rich import box
 
 console = Console()
+
+
+class TimeoutInput:
+    """跨平台的超时输入辅助类"""
+    
+    def __init__(self, timeout_seconds: int = 60):
+        """
+        初始化超时输入
+        
+        Args:
+            timeout_seconds: 超时秒数
+        """
+        self.timeout_seconds = timeout_seconds
+        self.user_input = None
+        self.input_received = False
+        self.input_thread = None
+    
+    def _input_thread_func(self, prompt_text: str, default: str):
+        """输入线程函数"""
+        try:
+            result = Prompt.ask(prompt_text, default=default)
+            if not self.input_received:  # 只在未超时时保存结果
+                self.user_input = result
+                self.input_received = True
+        except Exception:
+            pass
+    
+    def prompt_with_timeout(self, prompt_text: str, default: str = "0") -> Optional[str]:
+        """
+        带超时的输入提示（跨平台）
+        
+        Args:
+            prompt_text: 提示文本
+            default: 默认值
+            
+        Returns:
+            Optional[str]: 用户输入或默认值，None 表示超时
+        """
+        # 在单独的线程中执行输入操作
+        self.input_thread = threading.Thread(
+            target=self._input_thread_func,
+            args=(prompt_text, default)
+        )
+        self.input_thread.daemon = True
+        self.input_thread.start()
+        
+        # 等待输入或超时
+        self.input_thread.join(timeout=self.timeout_seconds)
+        
+        # 检查是否收到输入
+        if self.input_received:
+            return self.user_input
+        else:
+            # 超时了，标记为已接收以防止后续输入干扰
+            self.input_received = True
+            return None
+    
+    def is_timed_out(self) -> bool:
+        """检查是否超时"""
+        return not self.input_received or self.user_input is None
 
 
 class RemoteDeployService:
@@ -487,11 +548,22 @@ class RemoteDeployService:
         console.print(table)
         console.print()
         
+        # 添加超时提示
+        console.print("[dim]💡 提示: 60秒内未输入将自动选择立即执行[/dim]")
+        console.print()
+        
         try:
-            choice = Prompt.ask(
+            # 使用跨平台的超时输入（60秒超时）
+            timeout_input = TimeoutInput(timeout_seconds=60)
+            choice = timeout_input.prompt_with_timeout(
                 "[bold cyan]请选择定时选项[/bold cyan]",
                 default="0"
             )
+            
+            # 检查是否超时
+            if choice is None:
+                console.print("\n[yellow]⚠ 输入超时（60秒），将立即执行部署[/yellow]")
+                return 0
             
             choice = choice.strip()
             
