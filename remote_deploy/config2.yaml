@@ -1,0 +1,50 @@
+license_key: a7B89z678
+# ======================================================================================================
+#                                               项目配置
+# ======================================================================================================
+projects:
+  e车联:
+    backend:
+      workspace: ~/workspace/auto/auto-steward-api
+      build: mvn clean package -P run -Dmaven.test.skip=true
+      artifact: server-customer-api/target/server-customer-api-1.0-SNAPSHOT.war
+    
+    frontend:
+      workspace: ~/workspace/auto/auto-steward-back
+      build: nvm use 16.20 && npm install && npm run build
+      artifact: dist.tar.gz
+  
+  领航:
+    backend:
+      workspace: ~/workspace/ling_hang/ling_hang_server
+      build: mvn clean package -Dmaven.test.skip=true
+      artifact: yudao-server/target/yudao-server.jar
+    
+    frontend:
+      workspace: ~/workspace/ling_hang/ling_hang_admin
+      build: npm install && npm run build:prod
+      artifact: dist-prod.tar.gz
+
+
+# ======================================================================================================
+#                                               服务器配置
+# ======================================================================================================
+servers:
+  - name: e车联正式
+    host: 39.105.2.53:55555
+    user: echelian
+    project: e车联
+    paths:
+      backend: /vdbspace/web_programes/auto-steward/apache-tomcat-8.5.99/
+      frontend: /vdbspace/web_programes/auto-steward/web-ui/back-html/
+    restart: cd bin && sh shutdown.sh && startup.sh
+  
+  - name: 领航测试
+    host: 192.168.0.106:55555
+    user: admin
+    password: xcsk123*
+    project: 领航
+    paths:
+      backend: /home/admin/web_projects/dccw/server-api/
+      frontend: /home/admin/web_projects/dccw/server-backui/
+    restart: cd bin && sh startup1.sh
