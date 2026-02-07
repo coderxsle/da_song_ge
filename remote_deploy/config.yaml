@@ -22,8 +22,8 @@ servers:
       frontend_admin:
         working_dir: ~/workspace/ling_hang/ling_hang_admin  # 工作目录（可选）
         commands:
-          - npm install
-          - npm run build:prod
+          - export NODE_OPTIONS=--openssl-legacy-provider && npm install
+          - export NODE_OPTIONS=--openssl-legacy-provider && npm run build:prod
           - tar  --no-xattrs -czf dist-prod.tar.gz -C dist-prod .
     # 文件上传可以自定义项目，例如：backend、frontend、admin、、static、worker等
     upload:
