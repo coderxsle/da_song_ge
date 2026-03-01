@@ -63,12 +63,14 @@ def show_menu():
 
 def run_remote_deploy():
     """运行远程部署"""
+    # 延迟导入，避免启动时加载所有模块
+    from remote_deploy.deploy_service import RemoteDeployService
+    from rich.console import Console
+    
+    console = Console()
     console.clear()
     
     try:
-        # 直接导入并调用部署服务（支持打包后的程序）
-        from remote_deploy.deploy_service import RemoteDeployService
-        
         # 执行部署
         RemoteDeployService.deploy()
         

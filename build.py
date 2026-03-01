@@ -59,14 +59,8 @@ def build_executable():
     print(f"\n🚀 开始为 {platform_name} 平台打包...")
     
     # 基础配置
-    app_name = "李雪松工具集"
+    app_name = "lxs"  # 使用英文名避免跨平台文件名问题
     main_script = "main.py"
-    
-    # 根据平台设置运行时解压目录
-    if platform_name == "windows":
-        runtime_tmpdir = "%USERPROFILE%\\.coderxslee\\._internal"
-    else:
-        runtime_tmpdir = "~/.coderxslee/._internal"
     
     # 获取 pyinstaller 路径
     pyinstaller_cmd = os.path.join(os.path.dirname(sys.executable), "pyinstaller")
@@ -77,22 +71,35 @@ def build_executable():
     cmd = [
         pyinstaller_cmd,
         "--name", app_name,
-        "--onefile",  # 单文件模式，便于分发
+        "--onefile",  # 单文件模式，便于分发和使用
         "--console",  # 使用控制台模式（命令行工具）
         "--clean",  # 清理临时文件
         "--noconfirm",  # 不询问确认
-        "--runtime-tmpdir", runtime_tmpdir,  # 指定解压目录，避免每次重新解压
+        "--upx-dir", "/opt/homebrew/bin",  # UPX 路径（macOS Homebrew）
+        # "--noupx",  # 如果 UPX 压缩导致问题，取消注释此行
         
         # 添加数据文件
         "--add-data", f"remote_deploy{os.pathsep}remote_deploy",
         "--add-data", f"common{os.pathsep}common",
         "--add-data", f"examples{os.pathsep}examples",
         
-        # 隐藏导入（仅保留 Rich 的 Unicode 数据，避免过度打包）
-        "--hidden-import", "rich",
-        "--hidden-import", "rich._unicode_data",
-        "--hidden-import", "rich._unicode_data.unicode17_0_0",
-        "--collect-all", "rich",
+        # 隐藏导入（只导入必需的模块）
+        "--hidden-import", "yaml",
+        "--hidden-import", "rich.console",
+        "--hidden-import", "rich.panel",
+        "--hidden-import", "rich.table",
+        "--hidden-import", "rich.prompt",
+        "--hidden-import", "rich.progress",
+        
+        # 排除不需要的大型模块（减少打包大小和解压时间）
+        # 注意：这些模块在运行时仍然可以动态导入
+        "--exclude-module", "tkinter",
+        "--exclude-module", "matplotlib",
+        "--exclude-module", "numpy",
+        "--exclude-module", "pandas",
+        "--exclude-module", "PIL",
+        "--exclude-module", "PyQt5",
+        "--exclude-module", "PyQt6",
         
         # 主脚本
         main_script
@@ -120,10 +127,6 @@ def build_executable():
         if exe_path.exists():
             size_mb = exe_path.stat().st_size / (1024 * 1024)
             print(f"📊 文件大小: {size_mb:.2f} MB")
-            if platform_name == "windows":
-                print(f"💡 运行时解压目录: %USERPROFILE%\\.coderxslee\\._internal (隐藏文件夹)")
-            else:
-                print(f"💡 运行时解压目录: ~/.coderxslee/._internal (隐藏文件夹)")
             
     except subprocess.CalledProcessError as e:
         print(f"\n❌ 打包失败: {e}")

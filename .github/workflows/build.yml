@@ -44,7 +44,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: windows-executable
-          path: dist/李雪松工具集.exe
+          path: dist/lxs.exe
           retention-days: 30
 
   build-macos:
@@ -78,7 +78,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macos-executable
-          path: dist/李雪松工具集
+          path: dist/lxs
           retention-days: 30
 
   create-release:
@@ -112,8 +112,8 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./artifacts/windows/李雪松工具集.exe
-            ./artifacts/macos/李雪松工具集
+            ./artifacts/windows/lxs.exe
+            ./artifacts/macos/lxs
           draft: false
           prerelease: false
           generate_release_notes: true
@@ -123,14 +123,14 @@ jobs:
             ### 📦 下载说明
             
             **Windows 用户：**
-            - 下载 `李雪松工具集.exe`
+            - 下载 `lxs.exe`
             - 双击运行即可
             
             **macOS 用户：**
-            - 下载 `李雪松工具集`
-            - 添加执行权限：`chmod +x 李雪松工具集`
-            - 如遇安全提示，执行：`xattr -cr 李雪松工具集`
-            - 运行：`./李雪松工具集`
+            - 下载 `lxs`
+            - 添加执行权限：`chmod +x lxs`
+            - 如遇安全提示，执行：`xattr -cr lxs`
+            - 运行：`./lxs`
             
             ### ⚙️ 首次运行
             
@@ -142,11 +142,11 @@ jobs:
             
             3. 再次运行程序即可使用
             
-            ### 💡 性能优化
+            ### 💡 使用说明
             
-            - 采用单文件打包，便于分发
-            - 首次运行会解压到 `~/.coderxslee/._internal` (隐藏目录)
-            - 后续启动速度显著提升，无需重复解压
+            - 单文件打包，下载即用，无需安装
+            - 首次运行会自动创建配置文件
+            - 配置文件位置见上方说明
             
             ### 📚 文档
             

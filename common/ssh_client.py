@@ -9,13 +9,16 @@ SSH 客户端模块
 import os
 import time
 from typing import Optional, Any, Callable, List, Dict, Tuple
-from fabric import Connection
 from rich.progress import Progress, TaskID, BarColumn, TimeElapsedColumn, SpinnerColumn, TextColumn, DownloadColumn
-import paramiko
-from scp import SCPClient
 import concurrent.futures
 from .env_utils import EnvUtils
 from .log_utils import log_info, log_error
+
+# 延迟导入 paramiko 和相关库，避免启动时加载（paramiko 很慢，约 134ms）
+# 这些库只在真正建立 SSH 连接时才需要
+# from fabric import Connection
+# import paramiko
+# from scp import SCPClient
 
 class SSHClient:
     """SSH 客户端类，提供连接和命令执行功能"""
@@ -29,7 +32,12 @@ class SSHClient:
 
     def __init__(self):
         if not hasattr(self, 'conn'):  # 确保只初始化一次
-            self.conn: Optional[Connection] = None
+            # 延迟导入，避免启动时加载
+            from fabric import Connection as _Connection
+            global Connection
+            Connection = _Connection
+            
+            self.conn: Optional[Any] = None  # 类型改为 Any，因为 Connection 是延迟导入的
 
     def disconnect(self):
         """关闭远程连接"""
@@ -68,6 +76,9 @@ class SSHClient:
             命令执行结果
         """
         try:
+            # 延迟导入
+            from fabric import Connection
+            
             # print(f"在本地执行命令: {command}")
             # 创建一个新的连接实例，指向 localhost
             local_conn = Connection("localhost")
@@ -106,6 +117,9 @@ class SSHClient:
             # 如果有进度回调，使用 fabric 的底层 paramiko 连接
             # 复用已有的连接，避免重新建立连接
             try:
+                # 延迟导入 SCPClient
+                from scp import SCPClient
+                
                 # 从 fabric 的 Connection 对象获取底层的 paramiko 连接
                 transport = self.conn.client.get_transport()
                 
@@ -125,9 +139,12 @@ class SSHClient:
 
 
 
-    def __create_connection(self) -> Optional[Connection]:
+    def __create_connection(self) -> Optional[Any]:
         """创建 SSH 连接"""
         try:
+            # 延迟导入
+            from fabric import Connection
+            
             server_ip = EnvUtils.get('SERVER_IP')
             server_port = EnvUtils.get('SERVER_PORT')  # 新增：获取端口
             server_user = EnvUtils.get('SERVER_USER')
