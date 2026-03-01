@@ -65,9 +65,8 @@ jobs:
         with:
           python-version: '3.12'
       
-      - name: Install UPX (for compression)
-        run: |
-          brew install upx
+      # 注意：macOS 上不安装 UPX，因为有已知的兼容性问题
+      # PyInstaller 会自动禁用 UPX 或使用 --noupx
       
       - name: Install dependencies
         run: |

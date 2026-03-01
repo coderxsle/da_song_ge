@@ -86,7 +86,12 @@ def build_executable():
                               timeout=5)
         if result.returncode == 0:
             upx_available = True
-            print("✓ 检测到 UPX，将启用压缩")
+            # macOS 上 UPX 有已知的兼容性问题，禁用
+            if platform_name == "macos":
+                print("⚠ macOS 检测到 UPX，但由于兼容性问题将禁用")
+                upx_available = False
+            else:
+                print("✓ 检测到 UPX，将启用压缩")
     except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
         print("⚠ 未检测到 UPX，将跳过压缩（可选优化）")
     
