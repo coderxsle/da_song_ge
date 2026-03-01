@@ -75,9 +75,27 @@ def build_executable():
         "--console",  # 使用控制台模式（命令行工具）
         "--clean",  # 清理临时文件
         "--noconfirm",  # 不询问确认
-        "--upx-dir", "/opt/homebrew/bin",  # UPX 路径（macOS Homebrew）
-        # "--noupx",  # 如果 UPX 压缩导致问题，取消注释此行
-        
+    ]
+    
+    # 检查 UPX 是否可用，如果可用则启用压缩
+    upx_available = False
+    try:
+        result = subprocess.run(["upx", "--version"], 
+                              capture_output=True, 
+                              text=True, 
+                              timeout=5)
+        if result.returncode == 0:
+            upx_available = True
+            print("✓ 检测到 UPX，将启用压缩")
+    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
+        print("⚠ 未检测到 UPX，将跳过压缩（可选优化）")
+    
+    # 如果 UPX 不可用，显式禁用以避免警告
+    if not upx_available:
+        cmd.append("--noupx")
+    
+    # 添加其他参数
+    cmd.extend([
         # 添加数据文件
         "--add-data", f"remote_deploy{os.pathsep}remote_deploy",
         "--add-data", f"common{os.pathsep}common",
@@ -92,7 +110,6 @@ def build_executable():
         "--hidden-import", "rich.progress",
         
         # 排除不需要的大型模块（减少打包大小和解压时间）
-        # 注意：这些模块在运行时仍然可以动态导入
         "--exclude-module", "tkinter",
         "--exclude-module", "matplotlib",
         "--exclude-module", "numpy",
@@ -103,7 +120,7 @@ def build_executable():
         
         # 主脚本
         main_script
-    ]
+    ])
     
     # 如果有图标文件，添加图标
     icon_path = Path("icon.ico" if platform_name == "windows" else "icon.icns")
