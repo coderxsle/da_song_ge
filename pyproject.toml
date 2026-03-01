@@ -34,11 +34,11 @@ dependencies = [
     "paramiko>=3.3.1",      # SSH 连接和操作库
     "scp>=0.14.5",          # SCP 文件传输库
     "fabric>=3.2.2",        # 远程服务器部署工具
-    "typer>=0.9.0",         # 命令行界面（CLI）框架
     "rich>=13.9.4",         # 终端美化和进度条库
-    "docker>=7.0.0",        # Docker Python SDK
-    "pydantic>=2.6.1",      # 数据验证和设置管理库
-    "python-dotenv>=1.0.0", # 环境变量管理库
+    # "typer>=0.9.0",         # 命令行界面（CLI）框架
+    # "docker>=7.0.0",        # Docker Python SDK
+    # "pydantic>=2.6.1",      # 数据验证和设置管理库
+    # "python-dotenv>=1.0.0", # 环境变量管理库
 ]
 
 # ============================================

@@ -71,7 +71,7 @@ def build_executable():
     cmd = [
         pyinstaller_cmd,
         "--name", app_name,
-        "--onefile",  # 打包成单个文件
+        "--onedir",  # 使用目录模式，显著提升启动速度（避免 onefile 每次解压）
         "--console",  # 使用控制台模式（命令行工具）
         "--clean",  # 清理临时文件
         "--noconfirm",  # 不询问确认
@@ -81,18 +81,10 @@ def build_executable():
         "--add-data", f"common{os.pathsep}common",
         "--add-data", f"examples{os.pathsep}examples",
         
-        # 隐藏导入（确保所有依赖都被打包）
+        # 隐藏导入（仅保留 Rich 的 Unicode 数据，避免过度打包）
         "--hidden-import", "rich",
         "--hidden-import", "rich._unicode_data",
         "--hidden-import", "rich._unicode_data.unicode17_0_0",
-        "--hidden-import", "yaml",
-        "--hidden-import", "paramiko",
-        "--hidden-import", "scp",
-        "--hidden-import", "fabric",
-        "--hidden-import", "typer",
-        "--hidden-import", "docker",
-        "--hidden-import", "pydantic",
-        "--hidden-import", "dotenv",
         "--collect-all", "rich",
         
         # 主脚本

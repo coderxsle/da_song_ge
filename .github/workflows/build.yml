@@ -31,24 +31,7 @@ jobs:
         shell: bash
       
       - name: Build Windows executable
-        run: |
-          python -m PyInstaller --name 李雪松工具集 --onefile --console --clean --noconfirm \
-            --add-data "remote_deploy;remote_deploy" \
-            --add-data "common;common" \
-            --add-data "examples;examples" \
-            --hidden-import rich \
-            --hidden-import rich._unicode_data \
-            --hidden-import rich._unicode_data.unicode17_0_0 \
-            --hidden-import yaml \
-            --hidden-import paramiko \
-            --hidden-import scp \
-            --hidden-import fabric \
-            --hidden-import typer \
-            --hidden-import docker \
-            --hidden-import pydantic \
-            --hidden-import dotenv \
-            --collect-all rich \
-            main.py
+        run: python build.py
         shell: bash
       
       - name: List dist directory
@@ -56,12 +39,19 @@ jobs:
           echo "Contents of dist directory:"
           dir dist
         shell: cmd
+
+      - name: Create ZIP archive
+        run: |
+          cd dist
+          powershell -Command "Compress-Archive -Path '李雪松工具集/*' -DestinationPath '李雪松工具集-windows.zip' -Force"
+          cd ..
+        shell: bash
       
       - name: Upload Windows artifact
         uses: actions/upload-artifact@v4
         with:
           name: windows-executable
-          path: dist/李雪松工具集.exe
+          path: dist/李雪松工具集-windows.zip
           retention-days: 30
 
   build-macos:
@@ -135,7 +125,7 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           files: |
-            ./artifacts/windows/李雪松工具集.exe
+            ./artifacts/windows/李雪松工具集-windows.zip
             ./artifacts/macos/李雪松工具集-macos.zip
           draft: false
           prerelease: false
@@ -146,8 +136,8 @@ jobs:
             ### 📦 下载说明
             
             **Windows 用户：**
-            - 下载 `李雪松工具集.exe`
-            - 双击运行即可
+            - 下载 `李雪松工具集-windows.zip`
+            - 解压后运行 `李雪松工具集/李雪松工具集.exe`
             
             **macOS 用户：**
             - 下载 `李雪松工具集-macos.zip`
