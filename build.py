@@ -62,6 +62,12 @@ def build_executable():
     app_name = "李雪松工具集"
     main_script = "main.py"
     
+    # 根据平台设置运行时解压目录
+    if platform_name == "windows":
+        runtime_tmpdir = "%USERPROFILE%\\.coderxslee\\._internal"
+    else:
+        runtime_tmpdir = "~/.coderxslee/._internal"
+    
     # 获取 pyinstaller 路径
     pyinstaller_cmd = os.path.join(os.path.dirname(sys.executable), "pyinstaller")
     if not os.path.exists(pyinstaller_cmd):
@@ -71,10 +77,11 @@ def build_executable():
     cmd = [
         pyinstaller_cmd,
         "--name", app_name,
-        "--onedir",  # 使用目录模式，显著提升启动速度（避免 onefile 每次解压）
+        "--onefile",  # 单文件模式，便于分发
         "--console",  # 使用控制台模式（命令行工具）
         "--clean",  # 清理临时文件
         "--noconfirm",  # 不询问确认
+        "--runtime-tmpdir", runtime_tmpdir,  # 指定解压目录，避免每次重新解压
         
         # 添加数据文件
         "--add-data", f"remote_deploy{os.pathsep}remote_deploy",
@@ -101,17 +108,22 @@ def build_executable():
     try:
         subprocess.run(cmd, check=True)
         print(f"\n✅ 打包成功！")
-        print(f"📁 可执行文件位置: dist/{app_name}")
         
         # 显示文件大小
         if platform_name == "windows":
             exe_path = Path(f"dist/{app_name}.exe")
+            print(f"📁 可执行文件位置: dist/{app_name}.exe")
         else:
             exe_path = Path(f"dist/{app_name}")
+            print(f"📁 可执行文件位置: dist/{app_name}")
         
         if exe_path.exists():
             size_mb = exe_path.stat().st_size / (1024 * 1024)
             print(f"📊 文件大小: {size_mb:.2f} MB")
+            if platform_name == "windows":
+                print(f"💡 运行时解压目录: %USERPROFILE%\\.coderxslee\\._internal (隐藏文件夹)")
+            else:
+                print(f"💡 运行时解压目录: ~/.coderxslee/._internal (隐藏文件夹)")
             
     except subprocess.CalledProcessError as e:
         print(f"\n❌ 打包失败: {e}")
