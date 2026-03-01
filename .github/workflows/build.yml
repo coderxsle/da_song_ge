@@ -78,6 +78,9 @@ jobs:
       - name: Build macOS executable
         run: python build.py
       
+      - name: Set executable permissions
+        run: chmod +x dist/lxs
+      
       - name: List dist directory
         run: |
           echo "Contents of dist directory:"
@@ -108,6 +111,9 @@ jobs:
         with:
           name: macos-executable
           path: ./artifacts/macos
+      
+      - name: Set executable permissions for macOS binary
+        run: chmod +x ./artifacts/macos/lxs
       
       - name: List artifacts
         run: |
