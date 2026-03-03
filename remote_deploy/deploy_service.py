@@ -21,11 +21,12 @@ from remote_deploy.command_executor import CommandExecutor
 from remote_deploy.local_command_executor import LocalCommandExecutor
 from remote_deploy.validate_config import show_servers_table
 from remote_deploy.license_validator import LicenseValidator
-from rich.console import Console
+from rich.console import Console, Group
 from rich.panel import Panel
 from rich.table import Table
 from rich.prompt import Prompt
 from rich.progress import Progress, BarColumn, TextColumn, TimeRemainingColumn
+from rich.live import Live
 from rich import box
 
 console = Console()
@@ -805,45 +806,55 @@ class RemoteDeployService:
         
         # 倒计时循环
         try:
-            start_time = time.time()
-            
-            while True:
-                elapsed = time.time() - start_time
-                remaining = delay_seconds - int(elapsed)
-                
+            total_seconds = max(1, int(delay_seconds))
+            start_time = time.monotonic()
+
+            def _build_countdown_line(remaining: int) -> str:
                 # 计算时分秒
                 hours = remaining // 3600
                 minutes = (remaining % 3600) // 60
                 seconds = remaining % 60
-                
+
                 # 格式化时间显示
                 if hours > 0:
                     time_str = f"{hours:02d}:{minutes:02d}:{seconds:02d}"
                 else:
                     time_str = f"{minutes:02d}:{seconds:02d}"
-                
-                # 计算进度百分比
-                progress_percent = int((elapsed / delay_seconds) * 100)
-                
+
+                # 计算进度百分比（基于 remaining，避免 elapsed 精度问题）
+                progress_percent = min(100, max(0, int(((total_seconds - remaining) / total_seconds) * 100)))
+
                 # 生成进度条（已完成部分用绿色，未完成部分用灰色）
                 bar_length = 50
                 filled_length = int(bar_length * progress_percent / 100)
                 filled_bar = f"[bold green]{'█' * filled_length}[/bold green]"
                 empty_bar = f"[grey62]{'░' * (bar_length - filled_length)}[/grey62]"
-                
-                # 显示倒计时（使用 \r 实现单行刷新）
-                console.print(
+
+                return (
                     f"⏰ 倒计时: [bold cyan]{time_str}[/bold cyan] "
-                    f"{filled_bar}{empty_bar} [bold yellow]{progress_percent}%[/bold yellow]",
-                    end="\r"
+                    f"{filled_bar}{empty_bar} [bold yellow]{progress_percent}%[/bold yellow]"
                 )
-                
-                # 检查是否结束（在显示后检查，确保显示最后一秒）
-                if remaining <= 0:
-                    break
-                
-                time.sleep(1)
-            
+
+            # 在倒计时行“下方”持续保留空白，避免贴终端底部
+            bottom_padding_lines = 10
+
+            with Live("", console=console, refresh_per_second=4, transient=True) as live:
+                while True:
+                    elapsed_seconds = int(time.monotonic() - start_time)
+                    remaining = max(0, total_seconds - elapsed_seconds)
+
+                    countdown_renderable = Group(
+                        _build_countdown_line(remaining),
+                        *([""] * bottom_padding_lines)
+                    )
+                    live.update(countdown_renderable)
+
+                    # 检查是否结束（在显示后检查，确保显示最后一秒）
+                    if remaining <= 0:
+                        break
+
+                    time.sleep(1)
+
             # 显示最后的 100% 进度
             bar_length = 50
             filled_bar = f"[bold green]{'█' * bar_length}[/bold green]"

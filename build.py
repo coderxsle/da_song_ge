@@ -75,29 +75,8 @@ def build_executable():
         "--console",  # 使用控制台模式（命令行工具）
         "--clean",  # 清理临时文件
         "--noconfirm",  # 不询问确认
+        "--noupx",  # 禁用 UPX，优先保证跨平台稳定性
     ]
-    
-    # 检查 UPX 是否可用，如果可用则启用压缩
-    upx_available = False
-    try:
-        result = subprocess.run(["upx", "--version"], 
-                              capture_output=True, 
-                              text=True, 
-                              timeout=5)
-        if result.returncode == 0:
-            upx_available = True
-            # macOS 上 UPX 有已知的兼容性问题，禁用
-            if platform_name == "macos":
-                print("⚠ macOS 检测到 UPX，但由于兼容性问题将禁用")
-                upx_available = False
-            else:
-                print("✓ 检测到 UPX，将启用压缩")
-    except (subprocess.TimeoutExpired, FileNotFoundError, subprocess.CalledProcessError):
-        print("⚠ 未检测到 UPX，将跳过压缩（可选优化）")
-    
-    # 如果 UPX 不可用，显式禁用以避免警告
-    if not upx_available:
-        cmd.append("--noupx")
     
     # 添加其他参数
     cmd.extend([
