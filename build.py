@@ -85,7 +85,7 @@ def build_executable():
         "--add-data", f"common{os.pathsep}common",
         "--add-data", f"examples{os.pathsep}examples",
         
-        # 隐藏导入（补齐 rich 在 Windows onefile 下所需模块和数据）
+        # 隐藏导入（补齐 rich 在 Windows onefile 下所需模块和 Unicode 数据）
         "--hidden-import", "yaml",
         "--hidden-import", "rich",
         "--hidden-import", "rich.console",
@@ -97,7 +97,7 @@ def build_executable():
         "--hidden-import", "rich.box",
         "--hidden-import", "rich._unicode_data",
         "--hidden-import", "rich._unicode_data.unicode17_0_0",
-        "--collect-all", "rich",
+        "--collect-all", "rich",  # 一并收集 rich 的资源文件，避免打包后运行时缺模块
         
         # 排除不需要的大型模块（减少打包大小和解压时间）
         "--exclude-module", "tkinter",
